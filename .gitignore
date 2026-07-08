@@ -1,0 +1,17 @@
+# WordPress core (not needed, image pulls it)
+wordpress/wp-admin/
+wordpress/wp-includes/
+wordpress/wp-*.php
+wordpress/xmlrpc.php
+wordpress/wp-content/uploads/
+wordpress/wp-content/upgrade/
+wordpress/wp-content/cache/
+wordpress/wp-content/plugins/*
+!wordpress/plugins/construction-tracker/
+
+# Env/secrets
+.env
+*.log
+
+# OS
+.DS_Store
