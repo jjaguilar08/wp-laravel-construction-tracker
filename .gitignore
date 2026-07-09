@@ -15,3 +15,6 @@ wordpress/wp-content/plugins/*
 
 # OS
 .DS_Store
+
+# Internal working notes (not for public repo)
+PROJECT_NOTES.md
