@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ConstructionDashboardController;
 use App\Http\Controllers\ConstructionLogController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseController;
@@ -12,15 +13,13 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
-
 // Construction Tracker (WP-backed) - kept as-is, will be repurposed later.
-Route::get('/construction', [DashboardController::class, 'index'])->name('construction.dashboard');
+Route::get('/construction', [ConstructionDashboardController::class, 'index'])->name('construction.dashboard');
 Route::get('/logs', [ConstructionLogController::class, 'index']);
 
 Route::middleware('auth')->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');

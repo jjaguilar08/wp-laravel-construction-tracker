@@ -2,131 +2,104 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Support\Facades\Http;
+use App\Models\Expense;
+use App\Models\IncomeExpectation;
+use App\Models\SavingsGoal;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class DashboardControllerTest extends TestCase
 {
-    /**
-     * Six entries spanning three months and all five categories, so filter
-     * combinations produce distinct, easily-asserted subsets.
-     *
-     * Hand-maintained mimic of the real WP `wp-tracker/v1/logs` response, not
-     * derived from it — if the WP plugin's response shape changes (fields
-     * added/renamed/removed), update this fixture (and its counterpart in
-     * ConstructionLogServiceTest) to match, or these tests will keep passing
-     * against a stale shape instead of catching the drift.
-     */
-    private function fixtureLogs(): array
+    use RefreshDatabase;
+
+    public function test_guests_are_redirected_to_login(): void
     {
-        return [
-            ['id' => 1, 'title' => 'Cement Delivery', 'entry_date' => '2026-01-15', 'category' => 'materials', 'amount' => 1000, 'notes' => ''],
-            ['id' => 2, 'title' => 'Crew Payroll', 'entry_date' => '2026-01-20', 'category' => 'payroll', 'amount' => 2500, 'notes' => ''],
-            ['id' => 3, 'title' => 'Building Permit', 'entry_date' => '2026-02-01', 'category' => 'permits', 'amount' => 300, 'notes' => ''],
-            ['id' => 4, 'title' => 'Gravel Hauling', 'entry_date' => '2026-02-10', 'category' => 'hauling', 'amount' => 450, 'notes' => ''],
-            ['id' => 5, 'title' => 'Excavator Rental', 'entry_date' => '2026-03-05', 'category' => 'equipment', 'amount' => 1200, 'notes' => ''],
-            ['id' => 6, 'title' => 'Lumber Order', 'entry_date' => '2026-03-15', 'category' => 'materials', 'amount' => 800, 'notes' => ''],
-        ];
+        $this->get('/dashboard')->assertRedirect('/login');
     }
 
-    private function fakeWordPress(): void
+    public function test_dashboard_shows_totals_income_and_savings_progress_for_the_current_month(): void
     {
-        Http::fake([
-            '*/wp-json/wp-tracker/v1/logs' => Http::response($this->fixtureLogs()),
-        ]);
-    }
+        $this->travelTo(Carbon::create(2026, 7, 15));
 
-    public function test_dashboard_with_no_filters_shows_every_entry_and_the_correct_totals(): void
-    {
-        $this->fakeWordPress();
+        $user = User::factory()->create();
 
-        $response = $this->get('/construction');
+        Expense::factory()->for($user)->create(['category' => 'food', 'amount' => 300, 'date' => '2026-07-05']);
+        Expense::factory()->for($user)->create(['category' => 'transport', 'amount' => 200, 'date' => '2026-07-10']);
+        // Outside the current month - must not count toward the total.
+        Expense::factory()->for($user)->create(['category' => 'food', 'amount' => 9999, 'date' => '2026-06-20']);
+
+        IncomeExpectation::factory()->for($user)->create(['month' => '2026-07-01', 'expected_amount' => 1000]);
+        SavingsGoal::factory()->for($user)->create(['month' => '2026-07-01', 'target_amount' => 400]);
+
+        $response = $this->actingAs($user)->get('/dashboard');
 
         $response->assertOk();
-
-        foreach ($this->fixtureLogs() as $entry) {
-            $response->assertSee($entry['title']);
-        }
-
-        // Category totals.
-        $response->assertSeeInOrder(['materials', '$1,800.00']);
-        $response->assertSee('$2,500.00'); // payroll
-        $response->assertSee('$300.00'); // permits
-        $response->assertSee('$450.00'); // hauling
-        $response->assertSee('$1,200.00'); // equipment
-
-        // Total spend across all six entries.
-        $response->assertSee('$6,250.00');
+        $response->assertSee('500.00'); // total spent: 300 + 200
+        $response->assertSee('1,000.00'); // expected income
+        $response->assertSee('400.00'); // savings goal target
+        // actual savings = 1000 - 500 = 500, which exceeds the 400 target,
+        // so progress is clamped to 100% rather than reading 125%.
+        $response->assertSee('100%');
+        $response->assertDontSee('9,999.00');
     }
 
-    public function test_filtering_by_category_only_shows_matching_entries_and_totals(): void
+    public function test_dashboard_prompts_for_missing_income_and_goal_instead_of_breaking(): void
     {
-        $this->fakeWordPress();
+        $this->travelTo(Carbon::create(2026, 7, 15));
 
-        $response = $this->get('/construction?category=materials');
+        $user = User::factory()->create();
+        Expense::factory()->for($user)->create(['amount' => 50, 'date' => '2026-07-05']);
+
+        $response = $this->actingAs($user)->get('/dashboard');
 
         $response->assertOk();
-        $response->assertSee('Cement Delivery');
-        $response->assertSee('Lumber Order');
-        $response->assertDontSee('Crew Payroll');
-        $response->assertDontSee('Building Permit');
-        $response->assertDontSee('Gravel Hauling');
-        $response->assertDontSee('Excavator Rental');
-
-        // Only the materials category total is shown, and it's the filtered total spend too.
-        $response->assertSee('$1,800.00');
+        $response->assertSee("You haven't set expected income for this month yet.", false);
+        $response->assertSee("You haven't set a savings goal for this month yet.", false);
+        $response->assertDontSee('%'); // no progress bar can be computed without both figures
     }
 
-    public function test_filtering_by_date_range_only_shows_matching_entries_and_totals(): void
+    public function test_category_totals_for_the_dashboard_are_grouped_and_summed_correctly(): void
     {
-        $this->fakeWordPress();
+        $this->travelTo(Carbon::create(2026, 7, 15));
 
-        $response = $this->get('/construction?from=2026-02-01&to=2026-02-28');
+        $user = User::factory()->create();
+        Expense::factory()->for($user)->create(['category' => 'food', 'amount' => 100, 'date' => '2026-07-01']);
+        Expense::factory()->for($user)->create(['category' => 'food', 'amount' => 50, 'date' => '2026-07-02']);
+        Expense::factory()->for($user)->create(['category' => 'transport', 'amount' => 75, 'date' => '2026-07-03']);
+
+        $response = $this->actingAs($user)->get('/dashboard');
 
         $response->assertOk();
-        $response->assertSee('Building Permit');
-        $response->assertSee('Gravel Hauling');
-        $response->assertDontSee('Cement Delivery');
-        $response->assertDontSee('Crew Payroll');
-        $response->assertDontSee('Excavator Rental');
-        $response->assertDontSee('Lumber Order');
-
-        $response->assertSee('$300.00'); // permits total
-        $response->assertSee('$450.00'); // hauling total
-        $response->assertSee('$750.00'); // total spend for the range
+        // food: 150, transport: 75, total spent: 225.
+        $response->assertSee('225.00');
+        $response->assertSee(json_encode(['Food', 'Transport']), false);
+        $response->assertSee(json_encode([150, 75]), false);
     }
 
-    public function test_combining_category_and_date_range_filters_narrows_to_the_intersection(): void
+    public function test_a_user_only_sees_their_own_data_on_the_dashboard(): void
     {
-        $this->fakeWordPress();
+        $this->travelTo(Carbon::create(2026, 7, 15));
 
-        $response = $this->get('/construction?category=materials&from=2026-03-01&to=2026-03-31');
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+
+        Expense::factory()->for($user)->create(['amount' => 100, 'date' => '2026-07-05']);
+        Expense::factory()->for($other)->create(['amount' => 99999, 'date' => '2026-07-05']);
+        IncomeExpectation::factory()->for($other)->create(['month' => '2026-07-01', 'expected_amount' => 55555]);
+        SavingsGoal::factory()->for($other)->create(['month' => '2026-07-01', 'target_amount' => 44444]);
+
+        $response = $this->actingAs($user)->get('/dashboard');
 
         $response->assertOk();
-        $response->assertSee('Lumber Order');
-        $response->assertDontSee('Cement Delivery'); // materials, but outside the date range
-        $response->assertDontSee('Crew Payroll');
-        $response->assertDontSee('Building Permit');
-        $response->assertDontSee('Gravel Hauling');
-        $response->assertDontSee('Excavator Rental');
-
-        // Only one $800 materials entry falls in range, so category total and total spend match.
-        $response->assertSee('$800.00');
-    }
-
-    public function test_a_filter_matching_nothing_shows_the_empty_state_instead_of_stale_data(): void
-    {
-        $this->fakeWordPress();
-
-        $response = $this->get('/construction?category=permits&from=2026-03-01&to=2026-03-31');
-
-        $response->assertOk();
-        $response->assertSee('No entries match these filters.');
-        $response->assertSee('No entries found.');
-        $response->assertSee('$0.00');
-
-        foreach ($this->fixtureLogs() as $entry) {
-            $response->assertDontSee($entry['title']);
-        }
+        $response->assertSee('100.00');
+        $response->assertDontSee('99,999.00');
+        $response->assertDontSee('55,555.00');
+        $response->assertDontSee('44,444.00');
+        // The user has no income expectation or savings goal of their own
+        // for this month, so the prompts should show despite $other's rows existing.
+        $response->assertSee("You haven't set expected income for this month yet.", false);
+        $response->assertSee("You haven't set a savings goal for this month yet.", false);
     }
 }

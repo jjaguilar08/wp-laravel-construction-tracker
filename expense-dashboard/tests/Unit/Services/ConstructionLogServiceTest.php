@@ -17,7 +17,7 @@ class ConstructionLogServiceTest extends TestCase
      * Hand-maintained mimic of the real WP `wp-tracker/v1/logs` response, not
      * derived from it — if the WP plugin's response shape changes (fields
      * added/renamed/removed), update this fixture (and its counterpart in
-     * DashboardControllerTest) to match, or these tests will keep passing
+     * ConstructionDashboardControllerTest) to match, or these tests will keep passing
      * against a stale shape instead of catching the drift.
      */
     private function fixtureLogs(): array

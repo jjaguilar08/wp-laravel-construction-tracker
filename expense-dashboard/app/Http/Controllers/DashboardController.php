@@ -2,77 +2,78 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\ConstructionLogService;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\RequestException;
+use App\Models\Expense;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
 /**
- * Renders the construction expense dashboard (`GET /construction`, route name `construction.dashboard`).
+ * Renders the authenticated user's finance overview for the current
+ * calendar month (`GET /dashboard`, route name `dashboard`).
  */
 class DashboardController extends Controller
 {
     /**
-     * The category options offered in the filter dropdown, and the fixed
-     * display order used wherever categories are listed.
+     * @return View The `dashboard` view, given:
+     *              - `month`: the current month, for display and for the quick-add
+     *              form's default date
+     *              - `totalSpent`: sum of the user's expenses dated within this month
+     *              - `categoryTotals`: Collection of category => summed amount for
+     *              this month, sorted descending
+     *              - `categories`: the fixed category list, for the quick-add form
+     *              - `incomeExpectation`: this month's `IncomeExpectation`, or null if
+     *              not set yet
+     *              - `savingsGoal`: this month's `SavingsGoal`, or null if not set yet
+     *              - `actualSavings`: expected income minus total spent, or null if no
+     *              expected income is set (see the comment in the method body for
+     *              why this can't be derived any other way)
+     *              - `savingsProgress`: `actualSavings` as a percentage of the savings
+     *              goal's target, clamped to [0, 100] for the progress bar, or null
+     *              if either figure is missing
      */
-    private const CATEGORIES = ['materials', 'payroll', 'permits', 'hauling', 'equipment'];
-
-    /**
-     * Fetch construction log entries from WordPress, apply any category/date
-     * filters from the query string, and render the dashboard view with the
-     * filtered entries, per-category totals, and total spend.
-     *
-     * If WordPress is unreachable, renders the same view with empty data and
-     * an `error` message instead of letting the exception propagate (see
-     * `ConstructionLogService::getLogs()` for what can throw).
-     *
-     * @param  Request  $request  Expects optional `category`, `from`, and `to`
-     *                            (ISO `YYYY-MM-DD`) query params; all are passed straight to the view
-     *                            to repopulate the filter form.
-     * @param  ConstructionLogService  $service  Injected by the container.
-     * @return View The `construction-dashboard` view, given:
-     *              - `entries`: filtered log entries, newest `entry_date` first
-     *              - `categoryTotals`: Collection of category => summed amount, sorted descending
-     *              - `totalSpend`: sum of `amount` across the filtered entries
-     *              - `categories`: the fixed category list, for the filter dropdown
-     *              - `filters`: the raw query params, to repopulate the filter form
-     *              - `error`: a user-facing message if WordPress was unreachable, else null
-     */
-    public function index(Request $request, ConstructionLogService $service): View
+    public function index(Request $request): View
     {
-        $filters = $request->only(['category', 'from', 'to']);
+        $user = $request->user();
+        $month = Carbon::now()->startOfMonth();
 
-        try {
-            $entries = $service->getLogs();
-        } catch (ConnectionException|RequestException) {
-            return view('construction-dashboard', [
-                'entries' => collect(),
-                'categoryTotals' => collect(),
-                'totalSpend' => 0,
-                'categories' => self::CATEGORIES,
-                'filters' => $filters,
-                'error' => 'Unable to connect to the WordPress API. Make sure it is running and try again.',
-            ]);
-        }
+        $monthExpenses = $user->expenses()
+            ->whereYear('date', $month->year)
+            ->whereMonth('date', $month->month)
+            ->get();
 
-        $filtered = $entries
-            ->when($filters['category'] ?? null, fn ($rows, $category) => $rows->where('category', $category))
-            ->when($filters['from'] ?? null, fn ($rows, $from) => $rows->where('entry_date', '>=', $from))
-            ->when($filters['to'] ?? null, fn ($rows, $to) => $rows->where('entry_date', '<=', $to));
+        $totalSpent = $monthExpenses->sum('amount');
 
-        $categoryTotals = $filtered->groupBy('category')
+        $categoryTotals = $monthExpenses->groupBy('category')
             ->map(fn ($group) => $group->sum('amount'))
             ->sortDesc();
 
-        return view('construction-dashboard', [
-            'entries' => $filtered->sortByDesc('entry_date')->values(),
+        $incomeExpectation = $user->incomeExpectations()->whereDate('month', $month->toDateString())->first();
+        $savingsGoal = $user->savingsGoals()->whereDate('month', $month->toDateString())->first();
+
+        // "Actual savings" for the month is expected income minus what's
+        // actually been spent so far - i.e. the money left over that could
+        // go toward the goal. This needs expected income as a baseline: with
+        // no income set we have no way to know what "leftover" even means,
+        // so we leave this null (prompting the user to set one) rather than
+        // treating unset income as $0, which would misleadingly read as
+        // "you overspent" before the user has entered anything.
+        $actualSavings = $incomeExpectation
+            ? $incomeExpectation->expected_amount - $totalSpent
+            : null;
+
+        $savingsProgress = ($savingsGoal && $actualSavings !== null && $savingsGoal->target_amount > 0)
+            ? max(0, min(100, round(($actualSavings / $savingsGoal->target_amount) * 100)))
+            : null;
+
+        return view('dashboard', [
+            'month' => $month,
+            'totalSpent' => $totalSpent,
             'categoryTotals' => $categoryTotals,
-            'totalSpend' => $filtered->sum('amount'),
-            'categories' => self::CATEGORIES,
-            'filters' => $filters,
-            'error' => null,
+            'categories' => Expense::CATEGORIES,
+            'incomeExpectation' => $incomeExpectation,
+            'savingsGoal' => $savingsGoal,
+            'actualSavings' => $actualSavings,
+            'savingsProgress' => $savingsProgress,
         ]);
     }
 }
