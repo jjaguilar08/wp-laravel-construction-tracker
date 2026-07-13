@@ -8,10 +8,38 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
+/**
+ * Renders the construction expense dashboard (`GET /construction`, route name `construction.dashboard`).
+ */
 class DashboardController extends Controller
 {
+    /**
+     * The category options offered in the filter dropdown, and the fixed
+     * display order used wherever categories are listed.
+     */
     private const CATEGORIES = ['materials', 'payroll', 'permits', 'hauling', 'equipment'];
 
+    /**
+     * Fetch construction log entries from WordPress, apply any category/date
+     * filters from the query string, and render the dashboard view with the
+     * filtered entries, per-category totals, and total spend.
+     *
+     * If WordPress is unreachable, renders the same view with empty data and
+     * an `error` message instead of letting the exception propagate (see
+     * `ConstructionLogService::getLogs()` for what can throw).
+     *
+     * @param  Request  $request  Expects optional `category`, `from`, and `to`
+     *                            (ISO `YYYY-MM-DD`) query params; all are passed straight to the view
+     *                            to repopulate the filter form.
+     * @param  ConstructionLogService  $service  Injected by the container.
+     * @return View The `construction-dashboard` view, given:
+     *              - `entries`: filtered log entries, newest `entry_date` first
+     *              - `categoryTotals`: Collection of category => summed amount, sorted descending
+     *              - `totalSpend`: sum of `amount` across the filtered entries
+     *              - `categories`: the fixed category list, for the filter dropdown
+     *              - `filters`: the raw query params, to repopulate the filter form
+     *              - `error`: a user-facing message if WordPress was unreachable, else null
+     */
     public function index(Request $request, ConstructionLogService $service): View
     {
         $filters = $request->only(['category', 'from', 'to']);
@@ -19,7 +47,7 @@ class DashboardController extends Controller
         try {
             $entries = $service->getLogs();
         } catch (ConnectionException|RequestException) {
-            return view('dashboard', [
+            return view('construction-dashboard', [
                 'entries' => collect(),
                 'categoryTotals' => collect(),
                 'totalSpend' => 0,
@@ -38,7 +66,7 @@ class DashboardController extends Controller
             ->map(fn ($group) => $group->sum('amount'))
             ->sortDesc();
 
-        return view('dashboard', [
+        return view('construction-dashboard', [
             'entries' => $filtered->sortByDesc('entry_date')->values(),
             'categoryTotals' => $categoryTotals,
             'totalSpend' => $filtered->sum('amount'),
