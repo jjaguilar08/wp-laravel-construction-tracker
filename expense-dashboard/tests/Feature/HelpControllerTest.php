@@ -2,11 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class HelpControllerTest extends TestCase
 {
+    use RefreshDatabase;
+
     /**
      * Hand-maintained mimic of the real WP `wp-tracker/v1/articles` response, not
      * derived from it — if the WP plugin's response shape changes (fields
@@ -57,7 +61,7 @@ class HelpControllerTest extends TestCase
         $response->assertOk();
 
         foreach ($this->fixtureArticles() as $article) {
-            if ('FAQs &amp; Tips' === $article['title']) {
+            if ($article['title'] === 'FAQs &amp; Tips') {
                 continue; // asserted separately below, decoded.
             }
 
@@ -96,5 +100,33 @@ class HelpControllerTest extends TestCase
         foreach ($this->fixtureArticles() as $article) {
             $response->assertDontSee($article['title']);
         }
+    }
+
+    public function test_guests_can_load_help_without_the_shared_nav_crashing(): void
+    {
+        // /help is intentionally not auth-gated, but shares the same nav partial as the
+        // authenticated pages (layouts.navigation), which assumes Auth::user() is present
+        // (e.g. Auth::user()->name in the settings dropdown). Guards this regression.
+        $this->fakeWordPress();
+
+        $response = $this->get('/help');
+
+        $response->assertOk();
+        $response->assertSee(__('Log In'));
+        $response->assertDontSee(__('Log Out'));
+    }
+
+    public function test_authenticated_users_see_the_shared_nav_with_help_highlighted_active(): void
+    {
+        $this->fakeWordPress();
+
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/help');
+
+        $response->assertOk();
+        $response->assertSee(__('Dashboard'));
+        $response->assertSee(__('Log Out'));
+        $response->assertSee('border-indigo-400', false); // active-state class on the Help nav-link
     }
 }
