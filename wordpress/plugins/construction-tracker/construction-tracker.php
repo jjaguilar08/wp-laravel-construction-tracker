@@ -53,6 +53,39 @@ function ct_register_construction_log_post_type() {
 add_action( 'init', 'ct_register_construction_log_post_type' );
 
 /**
+ * Register the `help_article` custom post type.
+ */
+function ct_register_help_article_post_type() {
+	$labels = array(
+		'name'               => __( 'Help Articles', 'construction-tracker' ),
+		'singular_name'      => __( 'Help Article', 'construction-tracker' ),
+		'add_new'            => __( 'Add New', 'construction-tracker' ),
+		'add_new_item'       => __( 'Add New Help Article', 'construction-tracker' ),
+		'edit_item'          => __( 'Edit Help Article', 'construction-tracker' ),
+		'new_item'           => __( 'New Help Article', 'construction-tracker' ),
+		'view_item'          => __( 'View Help Article', 'construction-tracker' ),
+		'search_items'       => __( 'Search Help Articles', 'construction-tracker' ),
+		'not_found'          => __( 'No help articles found', 'construction-tracker' ),
+		'not_found_in_trash' => __( 'No help articles found in Trash', 'construction-tracker' ),
+		'all_items'          => __( 'Help Articles', 'construction-tracker' ),
+		'menu_name'          => __( 'Help Articles', 'construction-tracker' ),
+	);
+
+	$args = array(
+		'labels'       => $labels,
+		'public'       => true,
+		'show_in_rest' => true,
+		'supports'     => array( 'title', 'editor', 'thumbnail' ),
+		'menu_icon'    => 'dashicons-editor-help',
+		'has_archive'  => true,
+		'rewrite'      => array( 'slug' => 'help-articles' ),
+	);
+
+	register_post_type( 'help_article', $args );
+}
+add_action( 'init', 'ct_register_help_article_post_type' );
+
+/**
  * Use a more descriptive title placeholder on the `construction_log` edit screen.
  *
  * @param string $title Existing placeholder text.
@@ -268,6 +301,16 @@ function ct_register_rest_routes() {
 			'permission_callback' => '__return_true',
 		)
 	);
+
+	register_rest_route(
+		'wp-tracker/v1',
+		'/articles',
+		array(
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => 'ct_get_help_articles',
+			'permission_callback' => '__return_true',
+		)
+	);
 }
 add_action( 'rest_api_init', 'ct_register_rest_routes' );
 
@@ -304,4 +347,38 @@ function ct_get_construction_logs( $request ) {
 	}
 
 	return new WP_REST_Response( $logs, 200 );
+}
+
+/**
+ * Callback for GET wp-tracker/v1/articles.
+ *
+ * Returns all published help_article entries as clean JSON.
+ *
+ * @param WP_REST_Request $request Full request object.
+ * @return WP_REST_Response
+ */
+function ct_get_help_articles( $request ) {
+	$posts = get_posts(
+		array(
+			'post_type'      => 'help_article',
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+		)
+	);
+
+	$articles = array();
+
+	foreach ( $posts as $post ) {
+		$articles[] = array(
+			'id'             => $post->ID,
+			'title'          => get_the_title( $post ),
+			'content'        => apply_filters( 'the_content', $post->post_content ),
+			'slug'           => $post->post_name,
+			'featured_image' => get_the_post_thumbnail_url( $post ),
+		);
+	}
+
+	return new WP_REST_Response( $articles, 200 );
 }
