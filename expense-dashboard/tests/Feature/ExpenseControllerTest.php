@@ -123,6 +123,76 @@ class ExpenseControllerTest extends TestCase
         $this->assertDatabaseCount('expenses', 0);
     }
 
+    public function test_creating_an_expense_rejects_an_oversized_amount(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/expenses', [
+            'amount' => '100000000.00',
+            'category' => 'food',
+            'date' => '2026-07-01',
+        ]);
+
+        $response->assertSessionHasErrors('amount');
+        $this->assertDatabaseCount('expenses', 0);
+    }
+
+    public function test_creating_an_expense_accepts_the_maximum_valid_amount(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/expenses', [
+            'amount' => '99999999.99',
+            'category' => 'food',
+            'date' => '2026-07-01',
+        ]);
+
+        $response->assertRedirect('/expenses');
+        $this->assertDatabaseHas('expenses', ['user_id' => $user->id, 'amount' => 99999999.99]);
+    }
+
+    public function test_creating_an_expense_rejects_more_than_two_decimal_places(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/expenses', [
+            'amount' => '42.995',
+            'category' => 'food',
+            'date' => '2026-07-01',
+        ]);
+
+        $response->assertSessionHasErrors('amount');
+        $this->assertDatabaseCount('expenses', 0);
+    }
+
+    public function test_creating_an_expense_accepts_exactly_two_decimal_places(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/expenses', [
+            'amount' => '42.99',
+            'category' => 'food',
+            'date' => '2026-07-01',
+        ]);
+
+        $response->assertRedirect('/expenses');
+        $this->assertDatabaseHas('expenses', ['user_id' => $user->id, 'amount' => 42.99]);
+    }
+
+    public function test_creating_an_expense_rejects_scientific_notation(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/expenses', [
+            'amount' => '1e2',
+            'category' => 'food',
+            'date' => '2026-07-01',
+        ]);
+
+        $response->assertSessionHasErrors('amount');
+        $this->assertDatabaseCount('expenses', 0);
+    }
+
     public function test_a_spoofed_user_id_in_the_request_is_ignored(): void
     {
         // The create form has no user_id field, but nothing stops a

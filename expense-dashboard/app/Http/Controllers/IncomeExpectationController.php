@@ -101,6 +101,11 @@ class IncomeExpectationController extends Controller
      * `$incomeExpectation` is excluded from the check so keeping the same
      * month doesn't falsely conflict with itself.
      *
+     * `expected_amount`'s `max` matches the `decimal(10,2)` column's true
+     * ceiling; the `regex` rejects more than 2 decimal places (which
+     * `decimal:2` would otherwise silently round on save) and scientific
+     * notation (which `numeric` alone allows).
+     *
      * @return array{month: string, expected_amount: string}
      */
     private function validated(Request $request, ?IncomeExpectation $incomeExpectation = null): array
@@ -122,7 +127,9 @@ class IncomeExpectationController extends Controller
                     }
                 },
             ],
-            'expected_amount' => ['required', 'numeric', 'min:0'],
+            'expected_amount' => ['required', 'numeric', 'min:0', 'max:99999999.99', 'regex:/^\d+(\.\d{1,2})?$/'],
+        ], [
+            'expected_amount.regex' => 'The expected amount must be a plain number with at most 2 decimal places (no scientific notation).',
         ]);
     }
 }

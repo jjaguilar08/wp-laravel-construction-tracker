@@ -96,15 +96,24 @@ class ExpenseController extends Controller
     /**
      * Shared validation rules for `store()` and `update()`.
      *
+     * `amount`'s `max` matches the `decimal(10,2)` column's true ceiling, so
+     * an oversized value gets a clean validation error instead of relying on
+     * DB-engine-dependent behavior (SQLite silently accepts it; MySQL/
+     * Postgres would error or truncate). The `regex` rejects both more than
+     * 2 decimal places (which `decimal:2` would otherwise silently round on
+     * save) and scientific notation (which `numeric` alone allows).
+     *
      * @return array{amount: string, category: string, date: string, notes: ?string}
      */
     private function validated(Request $request): array
     {
         return $request->validate([
-            'amount' => ['required', 'numeric', 'min:0.01'],
+            'amount' => ['required', 'numeric', 'min:0.01', 'max:99999999.99', 'regex:/^\d+(\.\d{1,2})?$/'],
             'category' => ['required', 'in:'.implode(',', Expense::CATEGORIES)],
             'date' => ['required', 'date'],
             'notes' => ['nullable', 'string'],
+        ], [
+            'amount.regex' => 'The amount must be a plain number with at most 2 decimal places (no scientific notation).',
         ]);
     }
 }

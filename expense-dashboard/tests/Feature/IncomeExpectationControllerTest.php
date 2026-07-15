@@ -74,6 +74,71 @@ class IncomeExpectationControllerTest extends TestCase
         $this->assertDatabaseHas('income_expectations', ['user_id' => $user->id, 'expected_amount' => 0]);
     }
 
+    public function test_setting_expected_income_rejects_an_oversized_amount(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/income-expectations', [
+            'month' => '2026-07',
+            'expected_amount' => '100000000.00',
+        ]);
+
+        $response->assertSessionHasErrors('expected_amount');
+        $this->assertDatabaseCount('income_expectations', 0);
+    }
+
+    public function test_setting_expected_income_accepts_the_maximum_valid_amount(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/income-expectations', [
+            'month' => '2026-07',
+            'expected_amount' => '99999999.99',
+        ]);
+
+        $response->assertRedirect('/income-expectations');
+        $this->assertDatabaseHas('income_expectations', ['user_id' => $user->id, 'expected_amount' => 99999999.99]);
+    }
+
+    public function test_setting_expected_income_rejects_more_than_two_decimal_places(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/income-expectations', [
+            'month' => '2026-07',
+            'expected_amount' => '42.995',
+        ]);
+
+        $response->assertSessionHasErrors('expected_amount');
+        $this->assertDatabaseCount('income_expectations', 0);
+    }
+
+    public function test_setting_expected_income_accepts_exactly_two_decimal_places(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/income-expectations', [
+            'month' => '2026-07',
+            'expected_amount' => '42.99',
+        ]);
+
+        $response->assertRedirect('/income-expectations');
+        $this->assertDatabaseHas('income_expectations', ['user_id' => $user->id, 'expected_amount' => 42.99]);
+    }
+
+    public function test_setting_expected_income_rejects_scientific_notation(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/income-expectations', [
+            'month' => '2026-07',
+            'expected_amount' => '1e2',
+        ]);
+
+        $response->assertSessionHasErrors('expected_amount');
+        $this->assertDatabaseCount('income_expectations', 0);
+    }
+
     public function test_a_malformed_month_value_is_rejected(): void
     {
         // Bypasses the <input type="month"> picker to POST a raw, invalid

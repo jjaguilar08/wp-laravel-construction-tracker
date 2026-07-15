@@ -77,6 +77,71 @@ class SavingsGoalControllerTest extends TestCase
         $this->assertDatabaseHas('savings_goals', ['user_id' => $user->id, 'target_amount' => 0]);
     }
 
+    public function test_setting_a_savings_goal_rejects_an_oversized_amount(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/savings-goals', [
+            'month' => '2026-07',
+            'target_amount' => '100000000.00',
+        ]);
+
+        $response->assertSessionHasErrors('target_amount');
+        $this->assertDatabaseCount('savings_goals', 0);
+    }
+
+    public function test_setting_a_savings_goal_accepts_the_maximum_valid_amount(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/savings-goals', [
+            'month' => '2026-07',
+            'target_amount' => '99999999.99',
+        ]);
+
+        $response->assertRedirect('/savings-goals');
+        $this->assertDatabaseHas('savings_goals', ['user_id' => $user->id, 'target_amount' => 99999999.99]);
+    }
+
+    public function test_setting_a_savings_goal_rejects_more_than_two_decimal_places(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/savings-goals', [
+            'month' => '2026-07',
+            'target_amount' => '42.995',
+        ]);
+
+        $response->assertSessionHasErrors('target_amount');
+        $this->assertDatabaseCount('savings_goals', 0);
+    }
+
+    public function test_setting_a_savings_goal_accepts_exactly_two_decimal_places(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/savings-goals', [
+            'month' => '2026-07',
+            'target_amount' => '42.99',
+        ]);
+
+        $response->assertRedirect('/savings-goals');
+        $this->assertDatabaseHas('savings_goals', ['user_id' => $user->id, 'target_amount' => 42.99]);
+    }
+
+    public function test_setting_a_savings_goal_rejects_scientific_notation(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/savings-goals', [
+            'month' => '2026-07',
+            'target_amount' => '1e2',
+        ]);
+
+        $response->assertSessionHasErrors('target_amount');
+        $this->assertDatabaseCount('savings_goals', 0);
+    }
+
     public function test_a_malformed_month_value_is_rejected(): void
     {
         $user = User::factory()->create();
