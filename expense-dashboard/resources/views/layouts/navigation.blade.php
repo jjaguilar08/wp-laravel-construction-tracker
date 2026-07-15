@@ -24,6 +24,9 @@
                     <x-nav-link :href="route('savings-goals.index')" :active="request()->routeIs('savings-goals.*')">
                         {{ __('Savings Goals') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('trends')" :active="request()->routeIs('trends')">
+                        {{ __('Trends') }}
+                    </x-nav-link>
                 </div>
             </div>
 
@@ -91,6 +94,9 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('savings-goals.index')" :active="request()->routeIs('savings-goals.*')">
                 {{ __('Savings Goals') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('trends')" :active="request()->routeIs('trends')">
+                {{ __('Trends') }}
             </x-responsive-nav-link>
         </div>
 
