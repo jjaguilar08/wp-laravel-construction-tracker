@@ -13,7 +13,7 @@
                 </div>
             @endif
 
-            <div class="grid gap-6 sm:grid-cols-3">
+            <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
                 <div class="rounded-lg border border-gray-200 bg-white p-6">
                     <p class="text-sm text-gray-500">Total Spent This Month</p>
                     <p class="mt-1 text-3xl font-semibold">${{ number_format($totalSpent, 2) }}</p>
@@ -68,7 +68,7 @@
                 </div>
             </div>
 
-            <div class="grid gap-6 lg:grid-cols-2">
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <div class="rounded-lg border border-gray-200 bg-white p-6">
                     <p class="text-sm text-gray-500">Spending by Category</p>
                     @if ($categoryTotals->isNotEmpty())
@@ -78,7 +78,7 @@
                     @endif
                 </div>
 
-                <div class="rounded-lg border border-gray-200 bg-white p-6">
+                <div id="quick-add-expense" class="rounded-lg border border-gray-200 bg-white p-6">
                     <p class="text-sm text-gray-500 mb-4">Quick Add Expense</p>
 
                     <form method="POST" action="{{ route('expenses.store') }}" class="space-y-4">
@@ -128,6 +128,17 @@
             </div>
         </div>
     </div>
+
+    {{-- Mobile-only quick-access FAB: jumps to the Quick Add Expense form
+         already on the page instead of duplicating it in a modal - desktop
+         shows that form inline without scrolling, so it has no FAB. --}}
+    <a href="#quick-add-expense"
+       class="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gray-800 text-white shadow-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:hidden"
+       aria-label="Jump to quick add expense form">
+        <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+    </a>
 
     @if ($categoryTotals->isNotEmpty())
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
