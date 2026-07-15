@@ -126,6 +126,70 @@
                     </form>
                 </div>
             </div>
+
+            <div class="rounded-lg border border-gray-200 bg-white p-6">
+                <div class="mb-4 flex items-center justify-between">
+                    <p class="text-sm text-gray-500">Recent Expenses</p>
+                    <a href="{{ route('expenses.index') }}" class="text-sm font-medium text-indigo-600 hover:underline">View all &rarr;</a>
+                </div>
+
+                @if ($recentExpenses->isEmpty())
+                    <p class="text-sm text-gray-500">
+                        You haven't logged any expenses yet.
+                    </p>
+                    <a href="{{ route('expenses.create') }}" class="mt-2 inline-block text-sm font-medium text-indigo-600 hover:underline">
+                        Add an expense &rarr;
+                    </a>
+                @else
+                    {{-- Mobile: stacked cards, no horizontal scroll --}}
+                    <div class="space-y-3 sm:hidden">
+                        @foreach ($recentExpenses as $expense)
+                            <div class="rounded-lg border border-gray-200 p-4 text-sm">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-medium text-gray-800">{{ $expense->date->format('Y-m-d') }}</span>
+                                    <span class="font-semibold">${{ number_format($expense->amount, 2) }}</span>
+                                </div>
+                                <dl class="mt-2 space-y-1">
+                                    <div class="flex justify-between gap-4">
+                                        <dt class="text-gray-500">Category</dt>
+                                        <dd class="capitalize text-gray-600">{{ $expense->category }}</dd>
+                                    </div>
+                                    <div class="flex justify-between gap-4">
+                                        <dt class="text-gray-500">Notes</dt>
+                                        <dd class="text-right text-gray-600">{{ $expense->notes }}</dd>
+                                    </div>
+                                </dl>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    {{-- sm and up: normal table --}}
+                    <div class="hidden overflow-hidden rounded-lg border border-gray-200 sm:block">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-500">Date</th>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-500">Category</th>
+                                        <th class="px-4 py-3 text-right font-medium text-gray-500">Amount</th>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-500">Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    @foreach ($recentExpenses as $expense)
+                                        <tr>
+                                            <td class="px-4 py-3 whitespace-nowrap text-gray-600">{{ $expense->date->format('Y-m-d') }}</td>
+                                            <td class="px-4 py-3 capitalize text-gray-600">{{ $expense->category }}</td>
+                                            <td class="px-4 py-3 text-right">${{ number_format($expense->amount, 2) }}</td>
+                                            <td class="px-4 py-3 text-gray-500">{{ $expense->notes }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
+            </div>
         </div>
     </div>
 

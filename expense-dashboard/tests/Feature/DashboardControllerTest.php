@@ -36,13 +36,16 @@ class DashboardControllerTest extends TestCase
         $response = $this->actingAs($user)->get('/dashboard');
 
         $response->assertOk();
-        $response->assertSee('500.00'); // total spent: 300 + 200
+        $response->assertSee('500.00'); // total spent this month: 300 + 200, excludes the June expense
         $response->assertSee('1,000.00'); // expected income
         $response->assertSee('400.00'); // savings goal target
         // actual savings = 1000 - 500 = 500, which exceeds the 400 target,
         // so progress is clamped to 100% rather than reading 125%.
         $response->assertSee('100%');
-        $response->assertDontSee('9,999.00');
+        // The June expense legitimately still appears in the not-month-scoped
+        // Recent Expenses list below (see RecentExpenses tests) - it's only
+        // excluded from this month's *total*, which is verified above.
+        $response->assertSee('9,999.00');
     }
 
     public function test_dashboard_does_not_divide_by_zero_when_the_savings_goal_target_is_zero(): void
@@ -108,6 +111,71 @@ class DashboardControllerTest extends TestCase
         $response->assertSee('225.00');
         $response->assertSee(json_encode(['Food', 'Transport']), false);
         $response->assertSee(json_encode([150, 75]), false);
+    }
+
+    public function test_recent_expenses_shows_the_5_most_recent_by_date_descending(): void
+    {
+        $user = User::factory()->create();
+
+        Expense::factory()->for($user)->create(['date' => '2026-07-01', 'notes' => 'Newest']);
+        Expense::factory()->for($user)->create(['date' => '2026-06-28', 'notes' => 'Sixth']);
+        Expense::factory()->for($user)->create(['date' => '2026-06-25', 'notes' => 'Fifth']);
+        Expense::factory()->for($user)->create(['date' => '2026-06-20', 'notes' => 'Fourth']);
+        Expense::factory()->for($user)->create(['date' => '2026-06-15', 'notes' => 'Third']);
+        Expense::factory()->for($user)->create(['date' => '2026-06-10', 'notes' => 'Second']);
+        Expense::factory()->for($user)->create(['date' => '2026-06-01', 'notes' => 'Oldest']);
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertOk();
+        // Only the 5 most recent by date show, in descending order - the
+        // 2 oldest are excluded from the list entirely.
+        $response->assertSeeInOrder(['Newest', 'Sixth', 'Fifth', 'Fourth', 'Third']);
+        $response->assertDontSee('Second');
+        $response->assertDontSee('Oldest');
+    }
+
+    public function test_recent_expenses_uses_created_at_as_a_tiebreaker_for_the_same_date(): void
+    {
+        $user = User::factory()->create();
+
+        $this->travelTo(Carbon::create(2026, 7, 1, 10, 0, 0));
+        Expense::factory()->for($user)->create(['date' => '2026-07-01', 'notes' => 'CreatedFirst']);
+
+        $this->travelTo(Carbon::create(2026, 7, 1, 10, 0, 5));
+        Expense::factory()->for($user)->create(['date' => '2026-07-01', 'notes' => 'CreatedSecond']);
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertOk();
+        // Same `date` for both - the one created later (created_at desc)
+        // must be listed first.
+        $response->assertSeeInOrder(['CreatedSecond', 'CreatedFirst']);
+    }
+
+    public function test_recent_expenses_only_shows_the_authenticated_users_own(): void
+    {
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+
+        Expense::factory()->for($user)->create(['date' => '2026-07-01', 'notes' => 'Mine']);
+        Expense::factory()->for($other)->create(['date' => '2026-07-02', 'notes' => 'NotMine']);
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertOk();
+        $response->assertSee('Mine');
+        $response->assertDontSee('NotMine');
+    }
+
+    public function test_recent_expenses_shows_an_empty_state_with_zero_expenses(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertOk();
+        $response->assertSee("You haven't logged any expenses yet.", false);
     }
 
     public function test_a_user_only_sees_their_own_data_on_the_dashboard(): void

@@ -30,6 +30,10 @@ class DashboardController extends Controller
      *              - `savingsProgress`: `actualSavings` as a percentage of the savings
      *              goal's target, clamped to [0, 100] for the progress bar, or null
      *              if either figure is missing
+     *              - `recentExpenses`: the user's 5 most recent `Expense` models
+     *              (by `date` desc, `created_at` desc as a tiebreaker), regardless
+     *              of month - a recent-activity feed, not scoped to the current
+     *              month like the totals above
      */
     public function index(Request $request): View
     {
@@ -39,6 +43,12 @@ class DashboardController extends Controller
         $monthExpenses = $user->expenses()
             ->whereYear('date', $month->year)
             ->whereMonth('date', $month->month)
+            ->get();
+
+        $recentExpenses = $user->expenses()
+            ->orderByDesc('date')
+            ->orderByDesc('created_at')
+            ->limit(5)
             ->get();
 
         $totalSpent = $monthExpenses->sum('amount');
@@ -74,6 +84,7 @@ class DashboardController extends Controller
             'savingsGoal' => $savingsGoal,
             'actualSavings' => $actualSavings,
             'savingsProgress' => $savingsProgress,
+            'recentExpenses' => $recentExpenses,
         ]);
     }
 }
