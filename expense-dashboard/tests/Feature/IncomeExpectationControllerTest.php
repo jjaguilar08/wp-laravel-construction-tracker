@@ -48,6 +48,50 @@ class IncomeExpectationControllerTest extends TestCase
         ]);
     }
 
+    public function test_setting_expected_income_rejects_a_negative_amount(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/income-expectations', [
+            'month' => '2026-07',
+            'expected_amount' => '-100',
+        ]);
+
+        $response->assertSessionHasErrors('expected_amount');
+        $this->assertDatabaseCount('income_expectations', 0);
+    }
+
+    public function test_setting_expected_income_accepts_zero(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/income-expectations', [
+            'month' => '2026-07',
+            'expected_amount' => '0',
+        ]);
+
+        $response->assertRedirect('/income-expectations');
+        $this->assertDatabaseHas('income_expectations', ['user_id' => $user->id, 'expected_amount' => 0]);
+    }
+
+    public function test_a_malformed_month_value_is_rejected(): void
+    {
+        // Bypasses the <input type="month"> picker to POST a raw, invalid
+        // value directly. Regression guard: Laravel's date_format rule
+        // round-trips the parsed date and compares it back against the
+        // original string, so an out-of-range month like "13" must not
+        // silently roll over into the following year instead of failing.
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/income-expectations', [
+            'month' => '2026-13',
+            'expected_amount' => '1000',
+        ]);
+
+        $response->assertSessionHasErrors('month');
+        $this->assertDatabaseCount('income_expectations', 0);
+    }
+
     public function test_only_one_entry_is_allowed_per_user_per_month(): void
     {
         $user = User::factory()->create();
@@ -91,6 +135,17 @@ class IncomeExpectationControllerTest extends TestCase
         $this->assertSame('7500.00', $entry->fresh()->expected_amount);
     }
 
+    public function test_a_user_cannot_view_another_users_edit_form(): void
+    {
+        $owner = User::factory()->create();
+        $intruder = User::factory()->create();
+        $entry = IncomeExpectation::factory()->for($owner)->create();
+
+        $response = $this->actingAs($intruder)->get("/income-expectations/{$entry->id}/edit");
+
+        $response->assertForbidden();
+    }
+
     public function test_a_user_cannot_update_another_users_entry(): void
     {
         $owner = User::factory()->create();
@@ -127,5 +182,15 @@ class IncomeExpectationControllerTest extends TestCase
 
         $response->assertForbidden();
         $this->assertDatabaseHas('income_expectations', ['id' => $entry->id]);
+    }
+
+    public function test_deleting_a_user_cascades_to_their_income_expectations(): void
+    {
+        $user = User::factory()->create();
+        $entry = IncomeExpectation::factory()->for($user)->create();
+
+        $user->delete();
+
+        $this->assertDatabaseMissing('income_expectations', ['id' => $entry->id]);
     }
 }

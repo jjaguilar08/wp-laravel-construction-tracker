@@ -1,10 +1,7 @@
 <?php
 
-use App\Http\Controllers\ConstructionDashboardController;
-use App\Http\Controllers\ConstructionLogController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseController;
-use App\Http\Controllers\HelpController;
 use App\Http\Controllers\IncomeExpectationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SavingsGoalController;
@@ -13,12 +10,6 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
-
-// Construction Tracker (WP-backed) - kept as-is, will be repurposed later.
-Route::get('/construction', [ConstructionDashboardController::class, 'index'])->name('construction.dashboard');
-Route::get('/logs', [ConstructionLogController::class, 'index']);
-
-Route::get('/help', [HelpController::class, 'index'])->name('help.index');
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

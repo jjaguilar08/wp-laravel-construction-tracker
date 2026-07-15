@@ -48,6 +48,48 @@ class SavingsGoalControllerTest extends TestCase
         ]);
     }
 
+    public function test_setting_a_savings_goal_rejects_a_negative_amount(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/savings-goals', [
+            'month' => '2026-07',
+            'target_amount' => '-100',
+        ]);
+
+        $response->assertSessionHasErrors('target_amount');
+        $this->assertDatabaseCount('savings_goals', 0);
+    }
+
+    public function test_setting_a_savings_goal_accepts_a_zero_target(): void
+    {
+        // A $0 target is a valid (if unusual) input - the dashboard's
+        // progress-bar math must guard against dividing by this later
+        // rather than the form rejecting it outright.
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/savings-goals', [
+            'month' => '2026-07',
+            'target_amount' => '0',
+        ]);
+
+        $response->assertRedirect('/savings-goals');
+        $this->assertDatabaseHas('savings_goals', ['user_id' => $user->id, 'target_amount' => 0]);
+    }
+
+    public function test_a_malformed_month_value_is_rejected(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/savings-goals', [
+            'month' => '2026-13',
+            'target_amount' => '500',
+        ]);
+
+        $response->assertSessionHasErrors('month');
+        $this->assertDatabaseCount('savings_goals', 0);
+    }
+
     public function test_only_one_goal_is_allowed_per_user_per_month(): void
     {
         $user = User::factory()->create();
@@ -90,6 +132,17 @@ class SavingsGoalControllerTest extends TestCase
         $this->assertSame('800.00', $goal->fresh()->target_amount);
     }
 
+    public function test_a_user_cannot_view_another_users_edit_form(): void
+    {
+        $owner = User::factory()->create();
+        $intruder = User::factory()->create();
+        $goal = SavingsGoal::factory()->for($owner)->create();
+
+        $response = $this->actingAs($intruder)->get("/savings-goals/{$goal->id}/edit");
+
+        $response->assertForbidden();
+    }
+
     public function test_a_user_cannot_update_another_users_goal(): void
     {
         $owner = User::factory()->create();
@@ -126,5 +179,15 @@ class SavingsGoalControllerTest extends TestCase
 
         $response->assertForbidden();
         $this->assertDatabaseHas('savings_goals', ['id' => $goal->id]);
+    }
+
+    public function test_deleting_a_user_cascades_to_their_savings_goals(): void
+    {
+        $user = User::factory()->create();
+        $goal = SavingsGoal::factory()->for($user)->create();
+
+        $user->delete();
+
+        $this->assertDatabaseMissing('savings_goals', ['id' => $goal->id]);
     }
 }

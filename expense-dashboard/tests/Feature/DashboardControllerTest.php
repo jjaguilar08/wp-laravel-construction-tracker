@@ -45,6 +45,38 @@ class DashboardControllerTest extends TestCase
         $response->assertDontSee('9,999.00');
     }
 
+    public function test_dashboard_does_not_divide_by_zero_when_the_savings_goal_target_is_zero(): void
+    {
+        $this->travelTo(Carbon::create(2026, 7, 15));
+
+        $user = User::factory()->create();
+        Expense::factory()->for($user)->create(['amount' => 100, 'date' => '2026-07-05']);
+        IncomeExpectation::factory()->for($user)->create(['month' => '2026-07-01', 'expected_amount' => 500]);
+        SavingsGoal::factory()->for($user)->create(['month' => '2026-07-01', 'target_amount' => 0]);
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertOk();
+    }
+
+    public function test_dashboard_clamps_progress_to_zero_when_overspent(): void
+    {
+        $this->travelTo(Carbon::create(2026, 7, 15));
+
+        $user = User::factory()->create();
+        Expense::factory()->for($user)->create(['amount' => 900, 'date' => '2026-07-05']);
+        IncomeExpectation::factory()->for($user)->create(['month' => '2026-07-01', 'expected_amount' => 500]);
+        SavingsGoal::factory()->for($user)->create(['month' => '2026-07-01', 'target_amount' => 400]);
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertOk();
+        // actual savings = 500 - 900 = -400, which is below zero, so
+        // progress must clamp to 0% rather than a negative percentage.
+        $response->assertSee('0%');
+        $response->assertDontSee('-100%');
+    }
+
     public function test_dashboard_prompts_for_missing_income_and_goal_instead_of_breaking(): void
     {
         $this->travelTo(Carbon::create(2026, 7, 15));

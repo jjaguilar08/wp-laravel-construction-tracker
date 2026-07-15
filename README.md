@@ -1,52 +1,51 @@
-# WP + Laravel Construction Tracker
+# Personal Finance Tracker
 
-A headless WordPress + Laravel portfolio project. WordPress manages construction 
-log entries (materials, payroll, permits, hauling, equipment) via a custom plugin 
-and REST API. Laravel consumes that API to build an expense dashboard.
+A Laravel portfolio project: a personal expense/finance tracker with user
+accounts. Users log expenses, set monthly expected income and a savings
+goal, and see a dashboard summarizing spend by category, income vs. spend,
+and savings progress for the current month.
 
-## Status: In Progress (Day 4 of 7 - WP plugin + full Laravel dashboard complete)
+## Status: In Progress
 
 ## Stack
-- WordPress (Docker) - custom plugin, custom post type, custom REST endpoint
-- Laravel - consumes the WP REST API via a dedicated service class (with 
-  response caching and error handling), renders a filterable expense dashboard 
-  with a Chart.js visualization
+- Laravel (Blade + Breeze auth), Tailwind 4 via Vite, Chart.js for the
+  category breakdown chart, SQLite (dev)
 
 ## Features
-- **WordPress plugin** (`wordpress/plugins/construction-tracker/`): registers a 
-  `construction_log` custom post type with fields (entry_date, category, amount, 
-  notes) and exposes them via a custom REST endpoint at 
-  `/wp-json/wp-tracker/v1/logs`.
-- **Laravel dashboard** (`expense-dashboard/`): a `ConstructionLogService` fetches 
-  entries from the WP REST API over HTTP, caching the response for 60 seconds 
-  and handling connection failures gracefully (a friendly error message instead 
-  of a crash if WordPress is unreachable). The dashboard displays total spend, 
-  a category-by-category breakdown, a Chart.js bar chart of spend by category, 
-  and a full entries table - all filterable by category and date range via 
-  plain GET query parameters (no JS framework required).
+- **Auth** (Laravel Breeze, Blade stack): registration/login, per-user data
+  scoping enforced via Eloquent Policies.
+- **Expenses**: CRUD (`/expenses`), amount/category/date/notes, scoped to
+  the authenticated user.
+- **Income expectations & savings goals**: one row per user per month
+  (`/income-expectations`, `/savings-goals`), enforced unique at the DB
+  level.
+- **Dashboard** (`/dashboard`, auth-gated): current-month total spend,
+  category breakdown with a Chart.js bar chart, expected income vs. spend,
+  and savings progress (expected income − spend), with friendly prompts
+  when income/goal aren't set yet for the month. Quick-add expense form
+  embedded on the page.
 
-## Engineering Notes
-A couple of things worth calling out from building this:
-- **Caching gotcha**: Laravel 13 defaults `serializable_classes` to `false` in 
-  `config/cache.php` - a security hardening that blocks `unserialize()` from 
-  reconstructing arbitrary PHP objects out of the cache. Caching a `Collection` 
-  directly worked on the first write but silently degraded to a 
-  `__PHP_Incomplete_Class` on the next read, only surfacing as a `TypeError`. 
-  Fixed by caching the plain decoded array instead and wrapping it in 
-  `collect()` after every read, rather than loosening the security default.
-- **QA pass**: ran a written manual test plan across filtering, the error path, 
-  caching, and mobile viewport rendering. Found and fixed a stale-Tailwind-build 
-  issue (new utility classes added to a Blade template aren't picked up until 
-  `npm run build` reruns) and a table overflow bug clipping content on narrow 
-  screens instead of scrolling.
+## Earlier Project Phase: WordPress + Laravel Headless CMS
+This project started as a portfolio piece demonstrating headless CMS
+architecture: a custom WordPress plugin ("Construction Tracker") exposing
+construction expense entries via a REST API, consumed by a Laravel
+dashboard. A `help_article` CPT and Laravel-side `/help` page were added
+later in that phase for onboarding content.
 
-## Coming Next
-- Automated test coverage (feature test for filtering, unit test for the 
-  service's caching/error handling)
-- README screenshots / demo GIF
-- Final polish pass
+That WordPress-backed code (`wordpress/plugins/construction-tracker/`, the
+`ConstructionLogService`/`ConstructionDashboardController`/
+`ConstructionLogController`, the `HelpArticleService`/`HelpController`, the
+`/construction`, `/logs`, and `/help` routes, and their views/tests) has
+since been removed from the shipping app. The project pivoted to a
+personal finance tracker with user accounts instead, and the WordPress
+integration was retired rather than repurposed.
 
-## WordPress Plugin
-Located in `wordpress/plugins/construction-tracker/`. Registers a `construction_log` 
-custom post type with fields (entry_date, category, amount, notes) exposed via 
-`/wp-json/wp-tracker/v1/logs`.
+It remains available in git history for anyone curious how the headless
+CMS integration worked - see commits prior to the removal, and
+`PROJECT_NOTES.md`'s Day 1-9 entries for the full build log (WP plugin
+setup, the REST endpoints, the Laravel consumer service, caching/error
+handling, and the `help_article` CPT addition).
+
+## Tech Stack
+PHP/Laravel (Jon's primary stack, 7+ years), WordPress (used during the
+earlier headless-CMS phase, retired), Docker, MySQL (WP side, retired)

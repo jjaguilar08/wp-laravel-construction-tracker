@@ -35,8 +35,4 @@ return [
         ],
     ],
 
-    'wp_tracker' => [
-        'base_url' => env('WP_TRACKER_BASE_URL', 'http://localhost:8080'),
-    ],
-
 ];
