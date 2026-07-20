@@ -13,6 +13,8 @@
 /.vscode
 /.zed
 /auth.json
+/design-reference
+/docs/QA_TEST_PLAN.md
 /node_modules
 /public/build
 /public/fonts-manifest.dev.json
