@@ -196,7 +196,7 @@
     <footer class="border-t border-[#f9f4ed]/10">
         <div class="max-w-6xl mx-auto px-6 py-8 flex items-center justify-between gap-4 text-sm text-[#f9f4ed]/60">
             <span class="font-['Caprasimo'] text-[#f9f4ed]">Ledger</span>
-            <a href="#" class="hover:underline text-[#f9f4ed]/60">GitHub</a>
+            <a href="https://github.com/jjaguilar08/personal-finance-tracker" target="_blank" rel="noopener" class="hover:underline text-[#f9f4ed]/60">GitHub</a>
         </div>
     </footer>
 
