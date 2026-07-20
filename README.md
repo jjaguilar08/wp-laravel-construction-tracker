@@ -5,7 +5,8 @@ spending overview, custom budget cycles, and multi-currency support.
 
 **Live demo:** [ledger.jjaguilar.dev](https://ledger.jjaguilar.dev)
 
-<!-- screenshot: dashboard with AI overview -->
+<img width="1895" height="944" alt="image" src="https://github.com/user-attachments/assets/4151df47-1df4-4e4f-9c78-db9a2ef4b138" />
+
 
 ## What it does
 
