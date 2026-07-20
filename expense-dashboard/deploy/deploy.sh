@@ -37,6 +37,6 @@ echo "==> Bringing the app back up"
 php artisan up
 
 echo "==> Reloading PHP-FPM"
-sudo systemctl reload php8.3-fpm
+sudo systemctl reload php8.4-fpm
 
 echo "==> Done"
