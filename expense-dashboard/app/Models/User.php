@@ -46,4 +46,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(SavingsGoal::class);
     }
+
+    public function periodSummaries(): HasMany
+    {
+        return $this->hasMany(PeriodSummary::class);
+    }
 }

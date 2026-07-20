@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Expense;
-use App\Support\BudgetCycle;
+use App\Support\DashboardAggregates;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -38,17 +38,14 @@ class DashboardController extends Controller
      *              (by `date` desc, `created_at` desc as a tiebreaker), regardless
      *              of period - a recent-activity feed, not scoped to the current
      *              period like the totals above
+     *              - `periodSummary`: the cached `PeriodSummary` (AI-generated spending
+     *              overview) for this period, or null if one hasn't been generated yet
+     *              (see `AiOverviewController`)
      */
     public function index(Request $request): View
     {
         $user = $request->user();
-        $period = BudgetCycle::current($user->cycle_start_day);
-        $periodStart = $period['start'];
-        $periodEnd = $period['end'];
-
-        $periodExpenses = $user->expenses()
-            ->whereBetween('date', [$periodStart->toDateString(), $periodEnd->toDateString()])
-            ->get();
+        $aggregates = DashboardAggregates::forUser($user);
 
         $recentExpenses = $user->expenses()
             ->orderByDesc('date')
@@ -56,42 +53,15 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
-        $totalSpent = $periodExpenses->sum('amount');
-
-        $categoryTotals = $periodExpenses->groupBy('category')
-            ->map(fn ($group) => $group->sum('amount'))
-            ->sortDesc();
-
-        $incomeExpectation = $user->incomeExpectations()->whereDate('period_start', $periodStart->toDateString())->first();
-        $savingsGoal = $user->savingsGoals()->whereDate('period_start', $periodStart->toDateString())->first();
-
-        // "Actual savings" for the period is expected income minus what's
-        // actually been spent so far - i.e. the money left over that could
-        // go toward the goal. This needs expected income as a baseline: with
-        // no income set we have no way to know what "leftover" even means,
-        // so we leave this null (prompting the user to set one) rather than
-        // treating unset income as $0, which would misleadingly read as
-        // "you overspent" before the user has entered anything.
-        $actualSavings = $incomeExpectation
-            ? $incomeExpectation->expected_amount - $totalSpent
-            : null;
-
-        $savingsProgress = ($savingsGoal && $actualSavings !== null && $savingsGoal->target_amount > 0)
-            ? max(0, min(100, round(($actualSavings / $savingsGoal->target_amount) * 100)))
-            : null;
+        $periodSummary = $user->periodSummaries()
+            ->whereDate('period_start', $aggregates['periodStart']->toDateString())
+            ->first();
 
         return view('dashboard', [
-            'periodStart' => $periodStart,
-            'periodEnd' => $periodEnd,
-            'periodLabel' => BudgetCycle::label($periodStart, $periodEnd),
-            'totalSpent' => $totalSpent,
-            'categoryTotals' => $categoryTotals,
+            ...$aggregates,
             'categories' => Expense::CATEGORIES,
-            'incomeExpectation' => $incomeExpectation,
-            'savingsGoal' => $savingsGoal,
-            'actualSavings' => $actualSavings,
-            'savingsProgress' => $savingsProgress,
             'recentExpenses' => $recentExpenses,
+            'periodSummary' => $periodSummary,
         ]);
     }
 }
