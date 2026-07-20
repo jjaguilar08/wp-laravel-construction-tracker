@@ -18,7 +18,7 @@ class SavingsGoalFactory extends Factory
     public function definition(): array
     {
         return [
-            'month' => $this->faker->dateTimeBetween('-6 months')->format('Y-m-01'),
+            'period_start' => $this->faker->dateTimeBetween('-6 months')->format('Y-m-01'),
             'target_amount' => $this->faker->randomFloat(2, 100, 2000),
         ];
     }

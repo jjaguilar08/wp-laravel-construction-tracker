@@ -3,27 +3,31 @@
 namespace App\Http\Controllers;
 
 use App\Models\Expense;
+use App\Support\BudgetCycle;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
 /**
- * Renders the authenticated user's finance overview for the current
- * calendar month (`GET /dashboard`, route name `dashboard`).
+ * Renders the authenticated user's finance overview for their current
+ * budget-cycle period (`GET /dashboard`, route name `dashboard`) - a
+ * calendar month for a user with the default `cycle_start_day` of 1,
+ * otherwise whatever custom period their `cycle_start_day` defines (see
+ * `App\Support\BudgetCycle`).
  */
 class DashboardController extends Controller
 {
     /**
      * @return View The `dashboard` view, given:
-     *              - `month`: the current month, for display and for the quick-add
-     *              form's default date
-     *              - `totalSpent`: sum of the user's expenses dated within this month
+     *              - `periodStart`/`periodEnd`: the current period's bounds
+     *              - `periodLabel`: a display label for the period (a month name if it's
+     *              calendar-aligned, otherwise a date range)
+     *              - `totalSpent`: sum of the user's expenses dated within this period
      *              - `categoryTotals`: Collection of category => summed amount for
-     *              this month, sorted descending
+     *              this period, sorted descending
      *              - `categories`: the fixed category list, for the quick-add form
-     *              - `incomeExpectation`: this month's `IncomeExpectation`, or null if
+     *              - `incomeExpectation`: this period's `IncomeExpectation`, or null if
      *              not set yet
-     *              - `savingsGoal`: this month's `SavingsGoal`, or null if not set yet
+     *              - `savingsGoal`: this period's `SavingsGoal`, or null if not set yet
      *              - `actualSavings`: expected income minus total spent, or null if no
      *              expected income is set (see the comment in the method body for
      *              why this can't be derived any other way)
@@ -32,17 +36,18 @@ class DashboardController extends Controller
      *              if either figure is missing
      *              - `recentExpenses`: the user's 5 most recent `Expense` models
      *              (by `date` desc, `created_at` desc as a tiebreaker), regardless
-     *              of month - a recent-activity feed, not scoped to the current
-     *              month like the totals above
+     *              of period - a recent-activity feed, not scoped to the current
+     *              period like the totals above
      */
     public function index(Request $request): View
     {
         $user = $request->user();
-        $month = Carbon::now()->startOfMonth();
+        $period = BudgetCycle::current($user->cycle_start_day);
+        $periodStart = $period['start'];
+        $periodEnd = $period['end'];
 
-        $monthExpenses = $user->expenses()
-            ->whereYear('date', $month->year)
-            ->whereMonth('date', $month->month)
+        $periodExpenses = $user->expenses()
+            ->whereBetween('date', [$periodStart->toDateString(), $periodEnd->toDateString()])
             ->get();
 
         $recentExpenses = $user->expenses()
@@ -51,16 +56,16 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
-        $totalSpent = $monthExpenses->sum('amount');
+        $totalSpent = $periodExpenses->sum('amount');
 
-        $categoryTotals = $monthExpenses->groupBy('category')
+        $categoryTotals = $periodExpenses->groupBy('category')
             ->map(fn ($group) => $group->sum('amount'))
             ->sortDesc();
 
-        $incomeExpectation = $user->incomeExpectations()->whereDate('month', $month->toDateString())->first();
-        $savingsGoal = $user->savingsGoals()->whereDate('month', $month->toDateString())->first();
+        $incomeExpectation = $user->incomeExpectations()->whereDate('period_start', $periodStart->toDateString())->first();
+        $savingsGoal = $user->savingsGoals()->whereDate('period_start', $periodStart->toDateString())->first();
 
-        // "Actual savings" for the month is expected income minus what's
+        // "Actual savings" for the period is expected income minus what's
         // actually been spent so far - i.e. the money left over that could
         // go toward the goal. This needs expected income as a baseline: with
         // no income set we have no way to know what "leftover" even means,
@@ -76,7 +81,9 @@ class DashboardController extends Controller
             : null;
 
         return view('dashboard', [
-            'month' => $month,
+            'periodStart' => $periodStart,
+            'periodEnd' => $periodEnd,
+            'periodLabel' => BudgetCycle::label($periodStart, $periodEnd),
             'totalSpent' => $totalSpent,
             'categoryTotals' => $categoryTotals,
             'categories' => Expense::CATEGORIES,

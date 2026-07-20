@@ -30,7 +30,7 @@
                             <div class="rounded-2xl border border-[#f9f4ed]/10 bg-[#2e2b25] p-4 text-sm">
                                 <div class="flex items-center justify-between">
                                     <span class="font-medium text-[#f9f4ed]">{{ $expense->date->format('Y-m-d') }}</span>
-                                    <span class="font-semibold text-[#ffc6a5]">${{ number_format($expense->amount, 2) }}</span>
+                                    <span class="font-semibold text-[#ffc6a5]">{{ money($expense->amount) }}</span>
                                 </div>
                                 <dl class="mt-2 space-y-1">
                                     <div class="flex justify-between gap-4">
@@ -76,7 +76,7 @@
                                                     {{ $expense->category }}
                                                 </span>
                                             </td>
-                                            <td class="px-4 py-3 text-right font-semibold text-[#ffc6a5]">${{ number_format($expense->amount, 2) }}</td>
+                                            <td class="px-4 py-3 text-right font-semibold text-[#ffc6a5]">{{ money($expense->amount) }}</td>
                                             <td class="px-4 py-3 text-[#f9f4ed]/60">{{ $expense->notes }}</td>
                                             <td class="whitespace-nowrap px-4 py-3 text-right space-x-3">
                                                 <a href="{{ route('expenses.edit', $expense) }}" class="text-[#f6a06b] hover:text-[#ffc6a5] hover:underline">Edit</a>

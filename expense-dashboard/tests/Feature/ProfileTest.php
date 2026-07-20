@@ -30,6 +30,8 @@ class ProfileTest extends TestCase
             ->patch('/profile', [
                 'name' => 'Test User',
                 'email' => 'test@example.com',
+                'cycle_start_day' => 1,
+                'currency' => 'USD',
             ]);
 
         $response
@@ -52,6 +54,8 @@ class ProfileTest extends TestCase
             ->patch('/profile', [
                 'name' => 'Test User',
                 'email' => $user->email,
+                'cycle_start_day' => 1,
+                'currency' => 'USD',
             ]);
 
         $response
@@ -59,6 +63,63 @@ class ProfileTest extends TestCase
             ->assertRedirect('/profile');
 
         $this->assertNotNull($user->refresh()->email_verified_at);
+    }
+
+    public function test_cycle_start_day_and_currency_can_be_updated(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'email' => $user->email,
+                'cycle_start_day' => 20,
+                'currency' => 'PHP',
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $user->refresh();
+
+        $this->assertSame(20, $user->cycle_start_day);
+        $this->assertSame('PHP', $user->currency);
+    }
+
+    public function test_an_unsupported_currency_is_rejected(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'email' => $user->email,
+                'cycle_start_day' => 1,
+                'currency' => 'EUR',
+            ]);
+
+        $response->assertSessionHasErrors('currency');
+        $this->assertSame('USD', $user->fresh()->currency);
+    }
+
+    public function test_cycle_start_day_out_of_range_is_rejected(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'email' => $user->email,
+                'cycle_start_day' => 32,
+                'currency' => 'USD',
+            ]);
+
+        $response->assertSessionHasErrors('cycle_start_day');
+        $this->assertSame(1, $user->fresh()->cycle_start_day);
     }
 
     public function test_user_can_delete_their_account(): void

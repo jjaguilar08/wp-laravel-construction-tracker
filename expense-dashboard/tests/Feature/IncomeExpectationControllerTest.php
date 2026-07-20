@@ -21,8 +21,8 @@ class IncomeExpectationControllerTest extends TestCase
         $user = User::factory()->create();
         $other = User::factory()->create();
 
-        IncomeExpectation::factory()->for($user)->create(['month' => '2026-07-01', 'expected_amount' => 5000]);
-        IncomeExpectation::factory()->for($other)->create(['month' => '2026-07-01', 'expected_amount' => 9999]);
+        IncomeExpectation::factory()->for($user)->create(['period_start' => '2026-07-01', 'expected_amount' => 5000]);
+        IncomeExpectation::factory()->for($other)->create(['period_start' => '2026-07-01', 'expected_amount' => 9999]);
 
         $response = $this->actingAs($user)->get('/income-expectations');
 
@@ -43,7 +43,7 @@ class IncomeExpectationControllerTest extends TestCase
         $response->assertRedirect('/income-expectations');
         $this->assertDatabaseHas('income_expectations', [
             'user_id' => $user->id,
-            'month' => '2026-07-01 00:00:00',
+            'period_start' => '2026-07-01 00:00:00',
             'expected_amount' => 5000,
         ]);
     }
@@ -160,7 +160,7 @@ class IncomeExpectationControllerTest extends TestCase
     public function test_only_one_entry_is_allowed_per_user_per_month(): void
     {
         $user = User::factory()->create();
-        IncomeExpectation::factory()->for($user)->create(['month' => '2026-07-01']);
+        IncomeExpectation::factory()->for($user)->create(['period_start' => '2026-07-01']);
 
         $response = $this->actingAs($user)->post('/income-expectations', [
             'month' => '2026-07',
@@ -171,10 +171,52 @@ class IncomeExpectationControllerTest extends TestCase
         $this->assertDatabaseCount('income_expectations', 1);
     }
 
+    public function test_a_custom_cycle_start_day_resolves_the_month_picker_to_the_correct_period_start(): void
+    {
+        $user = User::factory()->create(['cycle_start_day' => 20]);
+
+        $response = $this->actingAs($user)->post('/income-expectations', [
+            'month' => '2026-07',
+            'expected_amount' => '1000',
+        ]);
+
+        $response->assertRedirect('/income-expectations');
+        // "July" on a cycle that starts on the 20th means the period that
+        // starts Jul 20, not the 1st.
+        $this->assertDatabaseHas('income_expectations', [
+            'user_id' => $user->id,
+            'period_start' => '2026-07-20 00:00:00',
+        ]);
+    }
+
+    public function test_another_users_cycle_start_day_does_not_affect_this_users_uniqueness_check(): void
+    {
+        $user = User::factory()->create(['cycle_start_day' => 1]);
+        $other = User::factory()->create(['cycle_start_day' => 20]);
+
+        // $other's "July" resolves to period_start 2026-07-20; if that
+        // leaked into $user's uniqueness check somehow, it would never
+        // collide with $user's own calendar-month period_start of
+        // 2026-07-01 anyway - this confirms $user can still set their own
+        // July entry without being blocked by $other's row.
+        IncomeExpectation::factory()->for($other)->create(['period_start' => '2026-07-20']);
+
+        $response = $this->actingAs($user)->post('/income-expectations', [
+            'month' => '2026-07',
+            'expected_amount' => '1000',
+        ]);
+
+        $response->assertRedirect('/income-expectations');
+        $this->assertDatabaseHas('income_expectations', [
+            'user_id' => $user->id,
+            'period_start' => '2026-07-01 00:00:00',
+        ]);
+    }
+
     public function test_a_user_can_update_their_own_entry(): void
     {
         $user = User::factory()->create();
-        $entry = IncomeExpectation::factory()->for($user)->create(['month' => '2026-07-01', 'expected_amount' => 5000]);
+        $entry = IncomeExpectation::factory()->for($user)->create(['period_start' => '2026-07-01', 'expected_amount' => 5000]);
 
         $response = $this->actingAs($user)->put("/income-expectations/{$entry->id}", [
             'month' => '2026-07',
@@ -189,7 +231,7 @@ class IncomeExpectationControllerTest extends TestCase
     {
         // Regression guard: the unique-month check must ignore the entry being updated.
         $user = User::factory()->create();
-        $entry = IncomeExpectation::factory()->for($user)->create(['month' => '2026-07-01', 'expected_amount' => 5000]);
+        $entry = IncomeExpectation::factory()->for($user)->create(['period_start' => '2026-07-01', 'expected_amount' => 5000]);
 
         $response = $this->actingAs($user)->put("/income-expectations/{$entry->id}", [
             'month' => '2026-07',

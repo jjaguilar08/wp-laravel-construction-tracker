@@ -2,46 +2,51 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\BudgetCycle;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
 /**
- * Renders the authenticated user's total spend per month for the last 6
- * months, including the current month (`GET /trends`, route name `trends`).
+ * Renders the authenticated user's total spend per budget-cycle period for
+ * the last 6 periods, including the current one (`GET /trends`, route name
+ * `trends`). A period is a calendar month for a user with the default
+ * `cycle_start_day` of 1, otherwise whatever custom period their
+ * `cycle_start_day` defines (see `App\Support\BudgetCycle`).
  */
 class TrendController extends Controller
 {
     /**
-     * @return View The `trends` view, given `monthlyTotals`: a Collection of
+     * @return View The `trends` view, given `periodTotals`: a Collection of
      *              6 entries, oldest to newest, ending with the current
-     *              month - each `['month' => Carbon, 'total' => int|string]`.
-     *              A month with no expenses still gets an entry with a `0`
-     *              total rather than being omitted, so the chart/table stay
-     *              continuous across all 6 months.
+     *              period - each `['start' => Carbon, 'end' => Carbon,
+     *              'label' => string, 'shortLabel' => string, 'total' =>
+     *              int|string]`. A period with no expenses still gets an
+     *              entry with a `0` total rather than being omitted, so the
+     *              chart/table stay continuous across all 6 periods.
      */
     public function index(Request $request): View
     {
         $user = $request->user();
+        $cycleStartDay = $user->cycle_start_day;
 
-        $start = Carbon::now()->startOfMonth()->subMonths(5);
-        $end = Carbon::now()->endOfMonth();
+        $periods = BudgetCycle::recentPeriods(6, $cycleStartDay);
+        $start = $periods->first()['start'];
+        $end = $periods->last()['end'];
 
-        $totalsByMonth = $user->expenses()
+        $totalsByPeriodStart = $user->expenses()
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
             ->get()
-            ->groupBy(fn ($expense) => $expense->date->format('Y-m'))
+            ->groupBy(fn ($expense) => BudgetCycle::periodContaining($expense->date, $cycleStartDay)['start']->toDateString())
             ->map(fn ($group) => $group->sum('amount'));
 
-        $monthlyTotals = collect(range(5, 0))->map(function ($monthsAgo) use ($totalsByMonth) {
-            $month = Carbon::now()->startOfMonth()->subMonths($monthsAgo);
+        $periodTotals = $periods->map(fn ($period) => [
+            'start' => $period['start'],
+            'end' => $period['end'],
+            'label' => BudgetCycle::label($period['start'], $period['end']),
+            'shortLabel' => BudgetCycle::shortLabel($period['start'], $period['end']),
+            'total' => $totalsByPeriodStart->get($period['start']->toDateString(), 0),
+        ]);
 
-            return [
-                'month' => $month,
-                'total' => $totalsByMonth->get($month->format('Y-m'), 0),
-            ];
-        });
-
-        return view('trends', ['monthlyTotals' => $monthlyTotals]);
+        return view('trends', ['periodTotals' => $periodTotals]);
     }
 }

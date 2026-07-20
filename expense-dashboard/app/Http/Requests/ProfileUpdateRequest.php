@@ -26,6 +26,12 @@ class ProfileUpdateRequest extends FormRequest
                 'max:255',
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
+            'cycle_start_day' => ['required', 'integer', 'between:1,31'],
+            // Constrained to the currencies App\Support\Money actually has a
+            // symbol for, rather than accepting any 3-letter code and
+            // silently falling back to showing that code instead of a
+            // symbol everywhere money is displayed.
+            'currency' => ['required', Rule::in(['USD', 'PHP'])],
         ];
     }
 }

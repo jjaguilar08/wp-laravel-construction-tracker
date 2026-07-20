@@ -29,8 +29,8 @@
                         @foreach ($savingsGoals as $savingsGoal)
                             <div class="rounded-2xl border border-[#f9f4ed]/10 bg-[#2e2b25] p-4 text-sm">
                                 <div class="flex items-center justify-between">
-                                    <span class="font-medium text-[#f9f4ed]">{{ $savingsGoal->month->format('F Y') }}</span>
-                                    <span class="font-semibold text-[#f9f4ed]">${{ number_format($savingsGoal->target_amount, 2) }}</span>
+                                    <span class="font-medium text-[#f9f4ed]">{{ $savingsGoal->period_label }}</span>
+                                    <span class="font-semibold text-[#f9f4ed]">{{ money($savingsGoal->target_amount) }}</span>
                                 </div>
                                 <div class="mt-3 flex justify-end gap-3 border-t border-[#f9f4ed]/10 pt-3">
                                     <a href="{{ route('savings-goals.edit', $savingsGoal) }}" class="text-[#f6a06b] hover:text-[#ffc6a5] hover:underline">Edit</a>
@@ -50,7 +50,7 @@
                             <table class="min-w-full text-sm">
                                 <thead>
                                     <tr>
-                                        <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[#f9f4ed]/50">Month</th>
+                                        <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[#f9f4ed]/50">Period</th>
                                         <th class="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-[#f9f4ed]/50">Target Amount</th>
                                         <th class="px-4 py-3"></th>
                                     </tr>
@@ -58,8 +58,8 @@
                                 <tbody class="divide-y divide-[#f9f4ed]/8">
                                     @foreach ($savingsGoals as $savingsGoal)
                                         <tr class="hover:bg-[#f9f4ed]/[0.06]">
-                                            <td class="whitespace-nowrap px-4 py-3 text-[#f9f4ed]/70">{{ $savingsGoal->month->format('F Y') }}</td>
-                                            <td class="px-4 py-3 text-right font-semibold text-[#f9f4ed]">${{ number_format($savingsGoal->target_amount, 2) }}</td>
+                                            <td class="whitespace-nowrap px-4 py-3 text-[#f9f4ed]/70">{{ $savingsGoal->period_label }}</td>
+                                            <td class="px-4 py-3 text-right font-semibold text-[#f9f4ed]">{{ money($savingsGoal->target_amount) }}</td>
                                             <td class="whitespace-nowrap px-4 py-3 text-right space-x-3">
                                                 <a href="{{ route('savings-goals.edit', $savingsGoal) }}" class="text-[#f6a06b] hover:text-[#ffc6a5] hover:underline">Edit</a>
                                                 <form action="{{ route('savings-goals.destroy', $savingsGoal) }}" method="POST" class="inline" onsubmit="return confirm('Delete this goal?')">

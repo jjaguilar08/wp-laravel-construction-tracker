@@ -21,8 +21,8 @@ class SavingsGoalControllerTest extends TestCase
         $user = User::factory()->create();
         $other = User::factory()->create();
 
-        SavingsGoal::factory()->for($user)->create(['month' => '2026-07-01', 'target_amount' => 500]);
-        SavingsGoal::factory()->for($other)->create(['month' => '2026-07-01', 'target_amount' => 999]);
+        SavingsGoal::factory()->for($user)->create(['period_start' => '2026-07-01', 'target_amount' => 500]);
+        SavingsGoal::factory()->for($other)->create(['period_start' => '2026-07-01', 'target_amount' => 999]);
 
         $response = $this->actingAs($user)->get('/savings-goals');
 
@@ -43,7 +43,7 @@ class SavingsGoalControllerTest extends TestCase
         $response->assertRedirect('/savings-goals');
         $this->assertDatabaseHas('savings_goals', [
             'user_id' => $user->id,
-            'month' => '2026-07-01 00:00:00',
+            'period_start' => '2026-07-01 00:00:00',
             'target_amount' => 500,
         ]);
     }
@@ -158,7 +158,7 @@ class SavingsGoalControllerTest extends TestCase
     public function test_only_one_goal_is_allowed_per_user_per_month(): void
     {
         $user = User::factory()->create();
-        SavingsGoal::factory()->for($user)->create(['month' => '2026-07-01']);
+        SavingsGoal::factory()->for($user)->create(['period_start' => '2026-07-01']);
 
         $response = $this->actingAs($user)->post('/savings-goals', [
             'month' => '2026-07',
@@ -169,10 +169,52 @@ class SavingsGoalControllerTest extends TestCase
         $this->assertDatabaseCount('savings_goals', 1);
     }
 
+    public function test_a_custom_cycle_start_day_resolves_the_month_picker_to_the_correct_period_start(): void
+    {
+        $user = User::factory()->create(['cycle_start_day' => 20]);
+
+        $response = $this->actingAs($user)->post('/savings-goals', [
+            'month' => '2026-07',
+            'target_amount' => '500',
+        ]);
+
+        $response->assertRedirect('/savings-goals');
+        // "July" on a cycle that starts on the 20th means the period that
+        // starts Jul 20, not the 1st.
+        $this->assertDatabaseHas('savings_goals', [
+            'user_id' => $user->id,
+            'period_start' => '2026-07-20 00:00:00',
+        ]);
+    }
+
+    public function test_another_users_cycle_start_day_does_not_affect_this_users_uniqueness_check(): void
+    {
+        $user = User::factory()->create(['cycle_start_day' => 1]);
+        $other = User::factory()->create(['cycle_start_day' => 20]);
+
+        // $other's "July" resolves to period_start 2026-07-20; if that
+        // leaked into $user's uniqueness check somehow, it would never
+        // collide with $user's own calendar-month period_start of
+        // 2026-07-01 anyway - this confirms $user can still set their own
+        // July goal without being blocked by $other's row.
+        SavingsGoal::factory()->for($other)->create(['period_start' => '2026-07-20']);
+
+        $response = $this->actingAs($user)->post('/savings-goals', [
+            'month' => '2026-07',
+            'target_amount' => '500',
+        ]);
+
+        $response->assertRedirect('/savings-goals');
+        $this->assertDatabaseHas('savings_goals', [
+            'user_id' => $user->id,
+            'period_start' => '2026-07-01 00:00:00',
+        ]);
+    }
+
     public function test_a_user_can_update_their_own_goal(): void
     {
         $user = User::factory()->create();
-        $goal = SavingsGoal::factory()->for($user)->create(['month' => '2026-07-01', 'target_amount' => 500]);
+        $goal = SavingsGoal::factory()->for($user)->create(['period_start' => '2026-07-01', 'target_amount' => 500]);
 
         $response = $this->actingAs($user)->put("/savings-goals/{$goal->id}", [
             'month' => '2026-07',
@@ -186,7 +228,7 @@ class SavingsGoalControllerTest extends TestCase
     public function test_updating_a_goal_can_keep_the_same_month(): void
     {
         $user = User::factory()->create();
-        $goal = SavingsGoal::factory()->for($user)->create(['month' => '2026-07-01', 'target_amount' => 500]);
+        $goal = SavingsGoal::factory()->for($user)->create(['period_start' => '2026-07-01', 'target_amount' => 500]);
 
         $response = $this->actingAs($user)->put("/savings-goals/{$goal->id}", [
             'month' => '2026-07',

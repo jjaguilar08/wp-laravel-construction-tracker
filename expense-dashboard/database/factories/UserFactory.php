@@ -30,6 +30,14 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            // Matches the users table's own column defaults. Eloquent
+            // doesn't reload server-side defaults onto the in-memory model
+            // after an insert, and tests' actingAs() reuses that same
+            // in-memory instance - so leaving these unset here would leave
+            // $request->user()->cycle_start_day/currency null in every test
+            // even though the DB row itself has the correct defaults.
+            'cycle_start_day' => 1,
+            'currency' => 'USD',
         ];
     }
 

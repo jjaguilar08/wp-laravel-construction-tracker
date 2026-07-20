@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\IncomeExpectation;
+use App\Support\BudgetCycle;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -10,23 +11,34 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
- * CRUD for the authenticated user's per-month expected income
+ * CRUD for the authenticated user's per-period expected income
  * (`/income-expectations`, `except('show')`).
  *
- * One row per user per month is enforced both at the DB level (unique
- * `(user_id, month)` index) and in `validated()`, since the DB constraint
- * alone would surface as an unhandled `QueryException` rather than a clean
- * validation error.
+ * One row per user per budget-cycle period is enforced both at the DB level
+ * (unique `(user_id, period_start)` index) and in `validated()`, since the
+ * DB constraint alone would surface as an unhandled `QueryException` rather
+ * than a clean validation error.
  */
 class IncomeExpectationController extends Controller
 {
     /**
      * @return View The `income-expectations.index` view, given
-     *              `incomeExpectations`: the user's entries, newest month first.
+     *              `incomeExpectations`: the user's entries, newest period first, each
+     *              decorated with a display-only `period_label` (see
+     *              `App\Support\BudgetCycle::label()`) - a month name when the
+     *              period is calendar-aligned, otherwise a date range.
      */
     public function index(Request $request): View
     {
-        $incomeExpectations = $request->user()->incomeExpectations()->orderByDesc('month')->get();
+        $cycleStartDay = $request->user()->cycle_start_day;
+
+        $incomeExpectations = $request->user()->incomeExpectations()->orderByDesc('period_start')->get()
+            ->each(function ($incomeExpectation) use ($cycleStartDay) {
+                $incomeExpectation->period_label = BudgetCycle::label(
+                    $incomeExpectation->period_start,
+                    BudgetCycle::endFor($incomeExpectation->period_start, $cycleStartDay)
+                );
+            });
 
         return view('income-expectations.index', ['incomeExpectations' => $incomeExpectations]);
     }
@@ -92,44 +104,59 @@ class IncomeExpectationController extends Controller
     /**
      * Shared validation rules for `store()` and `update()`.
      *
-     * The `<input type="month">` field submits `"YYYY-MM"`; normalized here
-     * to the first of the month before validating. The uniqueness check
-     * uses `whereDate()` rather than a `Rule::unique()` column comparison
-     * because Eloquent/SQLite persists the `date`-cast `month` column as a
-     * full datetime string (e.g. `"2026-07-01 00:00:00"`), which a bare
-     * `"2026-07-01"` string comparison would never match. When updating,
-     * `$incomeExpectation` is excluded from the check so keeping the same
-     * month doesn't falsely conflict with itself.
+     * The `<input type="month">` field submits `"YYYY-MM"` - a native HTML
+     * widget, so it can only pick a calendar month, never an arbitrary
+     * cycle-aligned date. What that selection actually means is "the period
+     * whose start falls in this month": the chosen year/month is resolved
+     * to this user's actual `period_start` via `BudgetCycle::startForYearMonth()`
+     * using their `cycle_start_day` (the 1st of the month by default). The
+     * uniqueness check uses `whereDate()` rather than a `Rule::unique()`
+     * column comparison because Eloquent/SQLite persists the `date`-cast
+     * `period_start` column as a full datetime string (e.g.
+     * `"2026-07-01 00:00:00"`), which a bare `"2026-07-01"` string
+     * comparison would never match. When updating, `$incomeExpectation` is
+     * excluded from the check so keeping the same period doesn't falsely
+     * conflict with itself.
      *
      * `expected_amount`'s `max` matches the `decimal(10,2)` column's true
      * ceiling; the `regex` rejects more than 2 decimal places (which
      * `decimal:2` would otherwise silently round on save) and scientific
      * notation (which `numeric` alone allows).
      *
-     * @return array{month: string, expected_amount: string}
+     * @return array{period_start: string, expected_amount: string}
      */
     private function validated(Request $request, ?IncomeExpectation $incomeExpectation = null): array
     {
-        $request->merge(['month' => $request->input('month').'-01']);
-
-        return $request->validate([
-            'month' => [
-                'required',
-                'date_format:Y-m-d',
-                function ($attribute, $value, $fail) use ($request, $incomeExpectation) {
-                    $exists = $request->user()->incomeExpectations()
-                        ->whereDate('month', $value)
-                        ->when($incomeExpectation, fn ($query) => $query->whereKeyNot($incomeExpectation))
-                        ->exists();
-
-                    if ($exists) {
-                        $fail('You already have an expected income entry for this month.');
-                    }
-                },
-            ],
+        $validated = $request->validate([
+            'month' => ['required', 'date_format:Y-m'],
             'expected_amount' => ['required', 'numeric', 'min:0', 'max:99999999.99', 'regex:/^\d+(\.\d{1,2})?$/'],
         ], [
             'expected_amount.regex' => 'The expected amount must be a plain number with at most 2 decimal places (no scientific notation).',
         ]);
+
+        [$year, $monthNumber] = explode('-', $validated['month']);
+        $periodStart = BudgetCycle::startForYearMonth((int) $year, (int) $monthNumber, $request->user()->cycle_start_day);
+
+        // Kept under the "month" attribute key (rather than "period_start")
+        // so the failure surfaces next to the form's only date input.
+        $request->validate([
+            'month' => [
+                function ($attribute, $value, $fail) use ($request, $incomeExpectation, $periodStart) {
+                    $exists = $request->user()->incomeExpectations()
+                        ->whereDate('period_start', $periodStart->toDateString())
+                        ->when($incomeExpectation, fn ($query) => $query->whereKeyNot($incomeExpectation))
+                        ->exists();
+
+                    if ($exists) {
+                        $fail('You already have an expected income entry for this period.');
+                    }
+                },
+            ],
+        ]);
+
+        return [
+            'period_start' => $periodStart->toDateString(),
+            'expected_amount' => $validated['expected_amount'],
+        ];
     }
 }

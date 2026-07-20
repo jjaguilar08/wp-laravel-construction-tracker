@@ -30,21 +30,21 @@ class DashboardControllerTest extends TestCase
         // Outside the current month - must not count toward the total.
         Expense::factory()->for($user)->create(['category' => 'food', 'amount' => 9999, 'date' => '2026-06-20']);
 
-        IncomeExpectation::factory()->for($user)->create(['month' => '2026-07-01', 'expected_amount' => 1000]);
-        SavingsGoal::factory()->for($user)->create(['month' => '2026-07-01', 'target_amount' => 400]);
+        IncomeExpectation::factory()->for($user)->create(['period_start' => '2026-07-01', 'expected_amount' => 1000]);
+        SavingsGoal::factory()->for($user)->create(['period_start' => '2026-07-01', 'target_amount' => 400]);
 
         $response = $this->actingAs($user)->get('/dashboard');
 
         $response->assertOk();
-        $response->assertSee('500.00'); // total spent this month: 300 + 200, excludes the June expense
+        $response->assertSee('500.00'); // total spent this period: 300 + 200, excludes the June expense
         $response->assertSee('1,000.00'); // expected income
         $response->assertSee('400.00'); // savings goal target
         // actual savings = 1000 - 500 = 500, which exceeds the 400 target,
         // so progress is clamped to 100% rather than reading 125%.
         $response->assertSee('100%');
-        // The June expense legitimately still appears in the not-month-scoped
+        // The June expense legitimately still appears in the not-period-scoped
         // Recent Expenses list below (see RecentExpenses tests) - it's only
-        // excluded from this month's *total*, which is verified above.
+        // excluded from this period's *total*, which is verified above.
         $response->assertSee('9,999.00');
     }
 
@@ -54,8 +54,8 @@ class DashboardControllerTest extends TestCase
 
         $user = User::factory()->create();
         Expense::factory()->for($user)->create(['amount' => 100, 'date' => '2026-07-05']);
-        IncomeExpectation::factory()->for($user)->create(['month' => '2026-07-01', 'expected_amount' => 500]);
-        SavingsGoal::factory()->for($user)->create(['month' => '2026-07-01', 'target_amount' => 0]);
+        IncomeExpectation::factory()->for($user)->create(['period_start' => '2026-07-01', 'expected_amount' => 500]);
+        SavingsGoal::factory()->for($user)->create(['period_start' => '2026-07-01', 'target_amount' => 0]);
 
         $response = $this->actingAs($user)->get('/dashboard');
 
@@ -68,8 +68,8 @@ class DashboardControllerTest extends TestCase
 
         $user = User::factory()->create();
         Expense::factory()->for($user)->create(['amount' => 900, 'date' => '2026-07-05']);
-        IncomeExpectation::factory()->for($user)->create(['month' => '2026-07-01', 'expected_amount' => 500]);
-        SavingsGoal::factory()->for($user)->create(['month' => '2026-07-01', 'target_amount' => 400]);
+        IncomeExpectation::factory()->for($user)->create(['period_start' => '2026-07-01', 'expected_amount' => 500]);
+        SavingsGoal::factory()->for($user)->create(['period_start' => '2026-07-01', 'target_amount' => 400]);
 
         $response = $this->actingAs($user)->get('/dashboard');
 
@@ -90,8 +90,8 @@ class DashboardControllerTest extends TestCase
         $response = $this->actingAs($user)->get('/dashboard');
 
         $response->assertOk();
-        $response->assertSee("You haven't set expected income for this month yet.", false);
-        $response->assertSee("You haven't set a savings goal for this month yet.", false);
+        $response->assertSee("You haven't set expected income for this period yet.", false);
+        $response->assertSee("You haven't set a savings goal for this period yet.", false);
         $response->assertDontSee('%'); // no progress bar can be computed without both figures
     }
 
@@ -187,8 +187,8 @@ class DashboardControllerTest extends TestCase
 
         Expense::factory()->for($user)->create(['amount' => 100, 'date' => '2026-07-05']);
         Expense::factory()->for($other)->create(['amount' => 99999, 'date' => '2026-07-05']);
-        IncomeExpectation::factory()->for($other)->create(['month' => '2026-07-01', 'expected_amount' => 55555]);
-        SavingsGoal::factory()->for($other)->create(['month' => '2026-07-01', 'target_amount' => 44444]);
+        IncomeExpectation::factory()->for($other)->create(['period_start' => '2026-07-01', 'expected_amount' => 55555]);
+        SavingsGoal::factory()->for($other)->create(['period_start' => '2026-07-01', 'target_amount' => 44444]);
 
         $response = $this->actingAs($user)->get('/dashboard');
 
@@ -198,8 +198,29 @@ class DashboardControllerTest extends TestCase
         $response->assertDontSee('55,555.00');
         $response->assertDontSee('44,444.00');
         // The user has no income expectation or savings goal of their own
-        // for this month, so the prompts should show despite $other's rows existing.
-        $response->assertSee("You haven't set expected income for this month yet.", false);
-        $response->assertSee("You haven't set a savings goal for this month yet.", false);
+        // for this period, so the prompts should show despite $other's rows existing.
+        $response->assertSee("You haven't set expected income for this period yet.", false);
+        $response->assertSee("You haven't set a savings goal for this period yet.", false);
+    }
+
+    public function test_another_users_custom_cycle_start_day_does_not_affect_this_users_period(): void
+    {
+        $this->travelTo(Carbon::create(2026, 7, 15));
+
+        $user = User::factory()->create(['cycle_start_day' => 1]);
+        $other = User::factory()->create(['cycle_start_day' => 20]);
+
+        // On Jul 15, $other's 20th-of-the-month cycle is still in the
+        // period that started Jun 20 - so this expense, dated Jul 10,
+        // would fall in $other's *previous* period if their cycle_start_day
+        // leaked into $user's calculation. It must only ever be evaluated
+        // against $user's own (default, calendar-month) cycle.
+        Expense::factory()->for($user)->create(['amount' => 300, 'date' => '2026-07-10']);
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertOk();
+        $response->assertSee('July 2026', false);
+        $response->assertSee('300.00');
     }
 }

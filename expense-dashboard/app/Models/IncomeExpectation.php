@@ -10,16 +10,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * The expected income a user set for a given month; one row per
- * `(user_id, month)`, enforced by a DB unique index and by
+ * The expected income a user set for a given budget-cycle period; one row
+ * per `(user_id, period_start)`, enforced by a DB unique index and by
  * `IncomeExpectationController::validated()`.
  *
  * @property int $id
  * @property int $user_id
- * @property Carbon $month Always the 1st of the month.
+ * @property Carbon $period_start The start of the cycle period (see
+ *                                `App\Support\BudgetCycle`) - the 1st of the month for a user with the
+ *                                default `cycle_start_day` of 1, otherwise whatever day their cycle starts
+ *                                on.
  * @property string $expected_amount
  */
-#[Fillable(['user_id', 'month', 'expected_amount'])]
+#[Fillable(['user_id', 'period_start', 'expected_amount'])]
 class IncomeExpectation extends Model
 {
     /** @use HasFactory<IncomeExpectationFactory> */
@@ -28,7 +31,7 @@ class IncomeExpectation extends Model
     protected function casts(): array
     {
         return [
-            'month' => 'date',
+            'period_start' => 'date',
             'expected_amount' => 'decimal:2',
         ];
     }

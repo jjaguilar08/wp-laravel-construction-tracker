@@ -47,6 +47,22 @@
             @endif
         </div>
 
+        <div>
+            <x-input-label for="cycle_start_day" :value="__('Budget cycle start day')" />
+            <x-text-input id="cycle_start_day" name="cycle_start_day" type="number" min="1" max="31" class="mt-1 block w-full" :value="old('cycle_start_day', $user->cycle_start_day)" required />
+            <p class="mt-1 text-sm text-gray-500">{{ __('Day of the month your budget period starts on. Leave at 1 for a normal calendar month.') }}</p>
+            <x-input-error class="mt-2" :messages="$errors->get('cycle_start_day')" />
+        </div>
+
+        <div>
+            <x-input-label for="currency" :value="__('Currency')" />
+            <select id="currency" name="currency" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" required>
+                <option value="USD" @selected(old('currency', $user->currency) === 'USD')>USD ($)</option>
+                <option value="PHP" @selected(old('currency', $user->currency) === 'PHP')>PHP (₱)</option>
+            </select>
+            <x-input-error class="mt-2" :messages="$errors->get('currency')" />
+        </div>
+
         <div class="flex items-center gap-4">
             <x-primary-button>{{ __('Save') }}</x-primary-button>
 

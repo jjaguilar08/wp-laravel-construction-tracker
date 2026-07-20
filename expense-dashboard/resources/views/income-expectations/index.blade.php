@@ -29,8 +29,8 @@
                         @foreach ($incomeExpectations as $incomeExpectation)
                             <div class="rounded-2xl border border-[#f9f4ed]/10 bg-[#2e2b25] p-4 text-sm">
                                 <div class="flex items-center justify-between">
-                                    <span class="font-medium text-[#f9f4ed]">{{ $incomeExpectation->month->format('F Y') }}</span>
-                                    <span class="font-semibold text-[#ccdbb2]">${{ number_format($incomeExpectation->expected_amount, 2) }}</span>
+                                    <span class="font-medium text-[#f9f4ed]">{{ $incomeExpectation->period_label }}</span>
+                                    <span class="font-semibold text-[#ccdbb2]">{{ money($incomeExpectation->expected_amount) }}</span>
                                 </div>
                                 <div class="mt-3 flex justify-end gap-3 border-t border-[#f9f4ed]/10 pt-3">
                                     <a href="{{ route('income-expectations.edit', $incomeExpectation) }}" class="text-[#f6a06b] hover:text-[#ffc6a5] hover:underline">Edit</a>
@@ -50,7 +50,7 @@
                             <table class="min-w-full text-sm">
                                 <thead>
                                     <tr>
-                                        <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[#f9f4ed]/50">Month</th>
+                                        <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[#f9f4ed]/50">Period</th>
                                         <th class="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-[#f9f4ed]/50">Expected Amount</th>
                                         <th class="px-4 py-3"></th>
                                     </tr>
@@ -58,8 +58,8 @@
                                 <tbody class="divide-y divide-[#f9f4ed]/8">
                                     @foreach ($incomeExpectations as $incomeExpectation)
                                         <tr class="hover:bg-[#f9f4ed]/[0.06]">
-                                            <td class="whitespace-nowrap px-4 py-3 text-[#f9f4ed]/70">{{ $incomeExpectation->month->format('F Y') }}</td>
-                                            <td class="px-4 py-3 text-right font-semibold text-[#ccdbb2]">${{ number_format($incomeExpectation->expected_amount, 2) }}</td>
+                                            <td class="whitespace-nowrap px-4 py-3 text-[#f9f4ed]/70">{{ $incomeExpectation->period_label }}</td>
+                                            <td class="px-4 py-3 text-right font-semibold text-[#ccdbb2]">{{ money($incomeExpectation->expected_amount) }}</td>
                                             <td class="whitespace-nowrap px-4 py-3 text-right space-x-3">
                                                 <a href="{{ route('income-expectations.edit', $incomeExpectation) }}" class="text-[#f6a06b] hover:text-[#ffc6a5] hover:underline">Edit</a>
                                                 <form action="{{ route('income-expectations.destroy', $incomeExpectation) }}" method="POST" class="inline" onsubmit="return confirm('Delete this entry?')">

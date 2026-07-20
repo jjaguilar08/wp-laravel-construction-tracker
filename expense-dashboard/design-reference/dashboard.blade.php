@@ -1,13 +1,13 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-[#f9f4ed] leading-tight">
-            {{ __('Dashboard') }} — {{ $periodLabel }}
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+            {{ __('Dashboard') }} — {{ $month->format('F Y') }}
         </h2>
     </x-slot>
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="rounded-[32px] bg-[#201e1d] p-5 sm:p-8 space-y-6">
+            <div class="rounded-[32px] bg-[#f5ead8] p-5 sm:p-8 space-y-6">
 
                 @if (session('status'))
                     <div class="rounded-full border border-[#7a8a5e]/30 bg-[#f0fae1] px-4 py-3 text-sm text-[#56633f]">
@@ -17,18 +17,18 @@
 
                 {{-- Summary cards --}}
                 <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
-                    <div class="rounded-[28px] bg-[#474238] p-6 shadow-[0_1px_2px_rgba(46,43,37,0.14)]">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#f6a06b]">Total Spent This Period</p>
-                        <p class="mt-1 font-['Caprasimo'] text-[34px] leading-tight text-[#ffc6a5]">{{ money($totalSpent) }}</p>
+                    <div class="rounded-[28px] bg-[#ebddc5] p-6 shadow-[0_1px_2px_rgba(46,43,37,0.14)]">
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#f6a06b]">Total Spent This Month</p>
+                        <p class="mt-1 font-['Caprasimo'] text-[34px] leading-tight text-[#ffc6a5]">${{ number_format($totalSpent, 2) }}</p>
                     </div>
 
-                    <div class="rounded-[28px] bg-[#474238] p-6 shadow-[0_1px_2px_rgba(46,43,37,0.14)]">
+                    <div class="rounded-[28px] bg-[#ebddc5] p-6 shadow-[0_1px_2px_rgba(46,43,37,0.14)]">
                         <p class="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#aebf92]">Expected Income</p>
                         @if ($incomeExpectation)
-                            <p class="mt-1 font-['Caprasimo'] text-[34px] leading-tight text-[#ccdbb2]">{{ money($incomeExpectation->expected_amount) }}</p>
+                            <p class="mt-1 font-['Caprasimo'] text-[34px] leading-tight text-[#ccdbb2]">${{ number_format($incomeExpectation->expected_amount, 2) }}</p>
                         @else
                             <p class="mt-2 text-sm text-[#f9f4ed]/60">
-                                You haven't set expected income for this period yet.
+                                You haven't set expected income for this month yet.
                             </p>
                             <a href="{{ route('income-expectations.create') }}" class="mt-2 inline-block text-sm font-semibold text-[#f6a06b] hover:text-[#ffc6a5] hover:underline">
                                 Set expected income &rarr;
@@ -36,10 +36,10 @@
                         @endif
                     </div>
 
-                    <div class="rounded-[28px] bg-[#474238] p-6 shadow-[0_1px_2px_rgba(46,43,37,0.14)]">
+                    <div class="rounded-[28px] bg-[#ebddc5] p-6 shadow-[0_1px_2px_rgba(46,43,37,0.14)]">
                         <p class="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#f9f4ed]/60">Savings Goal</p>
                         @if ($savingsGoal)
-                            <p class="mt-1 font-['Caprasimo'] text-[34px] leading-tight text-[#f9f4ed]">{{ money($savingsGoal->target_amount) }}</p>
+                            <p class="mt-1 font-['Caprasimo'] text-[34px] leading-tight text-[#f9f4ed]">${{ number_format($savingsGoal->target_amount, 2) }}</p>
 
                             @if ($savingsProgress !== null)
                                 <div class="mt-3">
@@ -49,7 +49,7 @@
                                     <p class="mt-2 text-xs text-[#f9f4ed]/70">
                                         {{ $savingsProgress }}% of goal &middot;
                                         <span class="font-semibold {{ $actualSavings < 0 ? 'text-[#ffc6a5]' : 'text-[#ccdbb2]' }}">
-                                            {{ $actualSavings < 0 ? '-' : '' }}{{ money(abs($actualSavings)) }}
+                                            {{ $actualSavings < 0 ? '-' : '' }}${{ number_format(abs($actualSavings), 2) }}
                                             {{ $actualSavings < 0 ? 'over budget' : 'saved so far' }}
                                         </span>
                                     </p>
@@ -64,7 +64,7 @@
                             @endif
                         @else
                             <p class="mt-2 text-sm text-[#f9f4ed]/60">
-                                You haven't set a savings goal for this period yet.
+                                You haven't set a savings goal for this month yet.
                             </p>
                             <a href="{{ route('savings-goals.create') }}" class="mt-2 inline-block text-sm font-semibold text-[#f6a06b] hover:text-[#ffc6a5] hover:underline">
                                 Set a savings goal &rarr;
@@ -75,16 +75,16 @@
 
                 {{-- Chart + quick add --}}
                 <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                    <div class="rounded-[28px] bg-[#474238] p-6 shadow-[0_1px_2px_rgba(46,43,37,0.14)]">
+                    <div class="rounded-[28px] bg-[#ebddc5] p-6 shadow-[0_1px_2px_rgba(46,43,37,0.14)]">
                         <p class="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#f9f4ed]/60">Spending by Category</p>
                         @if ($categoryTotals->isNotEmpty())
                             <canvas id="categoryChart" class="mt-4"></canvas>
                         @else
-                            <p class="mt-3 text-sm text-[#f9f4ed]/45">No expenses logged this period yet.</p>
+                            <p class="mt-3 text-sm text-[#f9f4ed]/45">No expenses logged this month yet.</p>
                         @endif
                     </div>
 
-                    <div id="quick-add-expense" class="rounded-[28px] bg-[#474238] p-6 shadow-[0_1px_2px_rgba(46,43,37,0.14)]">
+                    <div id="quick-add-expense" class="rounded-[28px] bg-[#ebddc5] p-6 shadow-[0_1px_2px_rgba(46,43,37,0.14)]">
                         <p class="mb-4 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#f9f4ed]/60">Quick Add Expense</p>
 
                         <form method="POST" action="{{ route('expenses.store') }}" class="space-y-4">
@@ -140,14 +140,14 @@
                 </div>
 
                 {{-- Recent expenses --}}
-                <div class="rounded-[28px] bg-[#474238] p-6 shadow-[0_1px_2px_rgba(46,43,37,0.14)]">
+                <div class="rounded-[28px] bg-[#ebddc5] p-6 shadow-[0_1px_2px_rgba(46,43,37,0.14)]">
                     <div class="mb-4 flex items-center justify-between">
                         <p class="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#f9f4ed]/60">Recent Expenses</p>
                         <a href="{{ route('expenses.index') }}" class="text-sm font-semibold text-[#f6a06b] hover:text-[#ffc6a5] hover:underline">View all &rarr;</a>
                     </div>
 
                     @if ($recentExpenses->isEmpty())
-                        <p class="text-sm text-[#f9f4ed]/60">
+                        <p class="text-sm text-[#201e1d]/60">
                             You haven't logged any expenses yet.
                         </p>
                         <a href="{{ route('expenses.create') }}" class="mt-2 inline-block text-sm font-semibold text-[#f6a06b] hover:text-[#ffc6a5] hover:underline">
@@ -160,7 +160,7 @@
                                 <div class="rounded-2xl border border-[#f9f4ed]/10 bg-[#2e2b25] p-4 text-sm">
                                     <div class="flex items-center justify-between">
                                         <span class="font-medium text-[#f9f4ed]">{{ $expense->date->format('Y-m-d') }}</span>
-                                        <span class="font-semibold text-[#ffc6a5]">{{ money($expense->amount) }}</span>
+                                        <span class="font-semibold text-[#8c491a]">${{ number_format($expense->amount, 2) }}</span>
                                     </div>
                                     <dl class="mt-2 space-y-1">
                                         <div class="flex justify-between gap-4">
@@ -197,7 +197,7 @@
                                                         {{ $expense->category }}
                                                     </span>
                                                 </td>
-                                                <td class="px-4 py-3 text-right font-semibold text-[#ffc6a5]">{{ money($expense->amount) }}</td>
+                                                <td class="px-4 py-3 text-right font-semibold text-[#ffc6a5]">${{ number_format($expense->amount, 2) }}</td>
                                                 <td class="px-4 py-3 text-[#f9f4ed]/60">{{ $expense->notes }}</td>
                                             </tr>
                                         @endforeach
@@ -211,9 +211,7 @@
         </div>
     </div>
 
-    {{-- Mobile-only quick-access FAB: jumps to the Quick Add Expense form
-         already on the page instead of duplicating it in a modal - desktop
-         shows that form inline without scrolling, so it has no FAB. --}}
+    {{-- Mobile-only quick-access FAB --}}
     <a href="#quick-add-expense"
        class="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#f6a06b] text-[#2e2b25] shadow-lg hover:bg-[#ffc6a5] focus:outline-none focus:ring-2 focus:ring-[#f6a06b] focus:ring-offset-2 sm:hidden"
        aria-label="Jump to quick add expense form">
@@ -223,13 +221,9 @@
     </a>
 
     @if ($categoryTotals->isNotEmpty())
-        @php
-            $chartPalette = ['#f6a06b', '#aebf92', '#d67f48', '#8fa073', '#ffc6a5', '#ccdbb2'];
-            $chartBarColors = $categoryTotals->keys()->values()
-                ->map(fn ($category, $index) => $chartPalette[$index % count($chartPalette)]);
-        @endphp
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
         <script>
+            const palette = ['#f6a06b', '#aebf92', '#d67f48', '#8fa073', '#ffc6a5', '#ccdbb2'];
             new Chart(document.getElementById('categoryChart'), {
                 type: 'bar',
                 data: {
@@ -237,7 +231,7 @@
                     datasets: [{
                         label: 'Spend by Category',
                         data: @json($categoryTotals->values()),
-                        backgroundColor: @json($chartBarColors),
+                        backgroundColor: (ctx) => palette[ctx.dataIndex % palette.length],
                         borderRadius: 8,
                         maxBarThickness: 36,
                     }],
