@@ -58,7 +58,7 @@ a personal finance tracker with real user accounts, and the WordPress
 integration was later retired from the shipping app rather than kept
 alongside it. The full day-by-day build log — including that pivot, every
 feature added since, and the bugs found and fixed along the way — lives
-in [`PROJECT_NOTES.md`](PROJECT_NOTES.md) and the git history.
+in the git history.
 
 ## Local Setup
 
